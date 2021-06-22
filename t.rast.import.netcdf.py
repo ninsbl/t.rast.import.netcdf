@@ -264,7 +264,7 @@ def read_data(
     time_dimensions,
     input,
 ):
-    """"""
+    """Import or link data"""
     maps = []
     imp_flags = "o" if ignore_crs else None
     # r.external [-feahvtr]
