@@ -1,11 +1,11 @@
-# r.example.plus: GRASS GIS module example in Python
+# t.rast.import.netcdf: GRASS GIS module example in Python
 
 [![GRASS GIS module](https://img.shields.io/badge/GRASS%20GIS-module-%23009000)](https://grass.osgeo.org/)
-[![CI](https://github.com/wenzeslaus/r.example.plus/workflows/CI/badge.svg)](https://github.com/wenzeslaus/r.example.plus/actions?query=workflow%3A%22CI%22)
-[![Code quality check](https://github.com/wenzeslaus/r.example.plus/workflows/Code%20quality%20check/badge.svg)](https://github.com/wenzeslaus/r.example.plus/actions?query=workflow%3A%22Code%20quality%20check%22)
+[![CI](https://github.com/ninsbl/t.rast.import.netcdf/workflows/CI/badge.svg)](https://github.com/ninsbl/t.rast.import.netcdf/actions?query=workflow%3A%22CI%22)
+[![Code quality check](https://github.com/ninsbl/t.rast.import.netcdf/workflows/Code%20quality%20check/badge.svg)](https://github.com/ninsbl/t.rast.import.netcdf/actions?query=workflow%3A%22Code%20quality%20check%22)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Black code style check](https://github.com/wenzeslaus/r.example.plus/workflows/Black%20code%20style%20check/badge.svg)](https://github.com/wenzeslaus/r.example.plus/actions?query=workflow%3A%22Black%20code%20style%20check%22)
-[![Deploy online documentation](https://github.com/wenzeslaus/r.example.plus/workflows/Deploy%20online%20documentation/badge.svg)](https://github.com/wenzeslaus/r.example.plus/actions?query=workflow%3A%22Deploy%20online%20documentation%22)
+[![Black code style check](https://github.com/ninsbl/t.rast.import.netcdf/workflows/Black%20code%20style%20check/badge.svg)](https://github.com/ninsbl/t.rast.import.netcdf/actions?query=workflow%3A%22Black%20code%20style%20check%22)
+[![Deploy online documentation](https://github.com/ninsbl/t.rast.import.netcdf/workflows/Deploy%20online%20documentation/badge.svg)](https://github.com/ninsbl/t.rast.import.netcdf/actions?query=workflow%3A%22Deploy%20online%20documentation%22)
 
 This is an example of a GRASS GIS module for processing rasters in Python,
 it is showing:
@@ -38,8 +38,8 @@ a standard way:
 Once you have the files in place, you need to do some renaming:
 
 * Rename files to fit the name of your new module.
-* Search all the content of all files for r.example.plus and
-  r_example_plus and replace that with your module name.
+* Search all the content of all files for t.rast.import.netcdf and
+  t_rast_import_netcdf and replace that with your module name.
 
 ### Renaming protip
 
@@ -51,7 +51,7 @@ review the changes with git):
 ```
 FILES="Makefile *.* */*.* .github/*/*.*"
 sed -i 's/r\.example\.plus/r.minus/g' $FILES
-sed -i 's/r_example_plus/r_minus/g' $FILES
+sed -i 's/t_rast_import_netcdf/r_minus/g' $FILES
 ```
 
 ### Getting the GitHub Actions work
