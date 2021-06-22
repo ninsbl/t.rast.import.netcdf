@@ -1,6 +1,6 @@
 MODULE_TOPDIR = ../..
 
-PGM=r.example.plus
+PGM=t.rast.import.netcdf.py
 
 include $(MODULE_TOPDIR)/include/Make/Script.make
 
