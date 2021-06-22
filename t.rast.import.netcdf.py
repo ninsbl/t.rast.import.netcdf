@@ -123,10 +123,15 @@ import cf_units
 import grass.script as gscript
 import grass.temporal as tgis
 from grass.pygrass.modules import Module, MultiModule, ParallelModuleQueue
-#from grass.temporal. import update_from_registered_maps
-from grass.temporal.register import register_maps_in_space_time_dataset, register_map_object_list
+
+# from grass.temporal. import update_from_registered_maps
+from grass.temporal.register import (
+    register_maps_in_space_time_dataset,
+    register_map_object_list,
+)
 from grass.temporal.datetime_math import datetime_to_grass_datetime_string
- # python3 t.rast.import.netcdf.py -l input=https://thredds.met.no/thredds/fileServer/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc output=test basename=testt title=test description=test
+
+# python3 t.rast.import.netcdf.py -l input=https://thredds.met.no/thredds/fileServer/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc output=test basename=testt title=test description=test
 """
 options = {
     "input": "https://thredds.met.no/thredds/fileServer/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc",  # "https://thredds.met.no/thredds/dodsC/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc", #"https://thredds.met.no/thredds/catalog/senorge/seNorge2_1/TEMP1d/catalog.html?dataset=senorge/seNorge2_1/TEMP1d/seNorge_v2_1_TEMP1d_grid_2015.nc",
@@ -250,7 +255,14 @@ def get_import_type(options, flags, netcdf):
 
 # import or link data
 def read_data(
-    netcdf, metadata, options, import_type, ignore_crs, crop_to_region, time_dimensions, input
+    netcdf,
+    metadata,
+    options,
+    import_type,
+    ignore_crs,
+    crop_to_region,
+    time_dimensions,
+    input,
 ):
     """"""
     maps = []
@@ -262,18 +274,25 @@ def read_data(
     print(gscript.overwrite())
 
     # Setup import module
-    import_mod = Module(import_type, input=input, run_=False, finish_=False, flags=imp_flags, overwrite=gscript.overwrite())
+    import_mod = Module(
+        import_type,
+        input=input,
+        run_=False,
+        finish_=False,
+        flags=imp_flags,
+        overwrite=gscript.overwrite(),
+    )
     # import_mod.flags.l = ignore_crs
     if import_type != "r.external":
         import_mod.memory = options["memory"]
     if import_type == "r.import":
         import_mod.resample = options["resample"]
-        #import_mod.resolution = options["resolution"]
-        #import_mod.resolution_value = options["resolution_value"]
+        # import_mod.resolution = options["resolution"]
+        # import_mod.resolution_value = options["resolution_value"]
     if import_type == "r.in.gdal":
         import_mod.flags.r = crop_to_region
-        #import_mod.offset = options["offset"]
-        #import_mod.num_digits = options["num_digits"]
+        # import_mod.offset = options["offset"]
+        # import_mod.num_digits = options["num_digits"]
     # Setup metadata module
     meta_mod = Module("r.support", run_=False, finish_=False, **metadata)
     # Setup timestamp module
@@ -285,16 +304,16 @@ def read_data(
         mapname = "{}_{}".format(
             options["basename"], time_dimensions[i].strftime("%Y_%m_%d")
         )
-        maps.append(mapname+ "@" + tgis.get_current_mapset())
+        maps.append(mapname + "@" + tgis.get_current_mapset())
         new_import = deepcopy(import_mod)
-        new_import(band = i + 1,
-                   output = mapname)
+        new_import(band=i + 1, output=mapname)
         new_meta = deepcopy(meta_mod)
-        new_meta(map = mapname)
+        new_meta(map=mapname)
         new_time = deepcopy(time_mod)
-        new_time(map = mapname,
-                 date = datetime_to_grass_datetime_string(time_dimensions[i]))
-        #print(new_import, new_meta, new_time)
+        new_time(
+            map=mapname, date=datetime_to_grass_datetime_string(time_dimensions[i])
+        )
+        # print(new_import, new_meta, new_time)
         mm = MultiModule(
             module_list=[new_import, new_meta, new_time],
             sync=True,
@@ -303,10 +322,10 @@ def read_data(
         queue.put(mm)
     queue.wait()
     print(queue)
-    #queue.wait()
+    # queue.wait()
     proc_list = queue.get_finished_modules()
     print(proc_list)
-    #queue.get_num_run_procs()
+    # queue.get_num_run_procs()
     return maps
 
 
@@ -345,7 +364,7 @@ def main():
         type="strds",
         columns="name",
         where="mapset = '{}'".format(current_mapset),
-        stdout_=PIPE
+        stdout_=PIPE,
     ).outputs.stdout.split("\n")
 
     # Append if exists and overwrite allowed (do not update metadata)
@@ -372,17 +391,24 @@ def main():
     time_dimensions = get_time_dimensions(ncdf.GetMetadata())
 
     r_maps = read_data(
-        ncdf, ncdf_metadata, options, import_module, flags["o"], flags["r"], time_dimensions, input
+        ncdf,
+        ncdf_metadata,
+        options,
+        import_module,
+        flags["o"],
+        flags["r"],
+        time_dimensions,
+        input,
     )
 
     # Register in strds using tgis
     print(r_maps)
-    #tgis.register.register_map_object_list("strds", [tgis.RasterDataset(rmap + "@" + tgis.get_current_mapset()) for rmap in r_maps], tgis.SpaceTimeRasterDataset(strds + "@" + tgis.get_current_mapset())    )
+    # tgis.register.register_map_object_list("strds", [tgis.RasterDataset(rmap + "@" + tgis.get_current_mapset()) for rmap in r_maps], tgis.SpaceTimeRasterDataset(strds + "@" + tgis.get_current_mapset())    )
 
     tgis_strds = tgis.SpaceTimeRasterDataset(strds + "@" + tgis.get_current_mapset())
 
-    #register_map_object_list("raster",
-    #[tgis.RasterDataset(rmap) for rmap in r_maps], output_stds=tgis_strds, delete_empty=True)
+    # register_map_object_list("raster",
+    # [tgis.RasterDataset(rmap) for rmap in r_maps], output_stds=tgis_strds, delete_empty=True)
 
     register_maps_in_space_time_dataset(
         "raster",  # type,
