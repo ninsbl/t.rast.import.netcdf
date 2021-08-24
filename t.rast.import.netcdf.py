@@ -144,12 +144,17 @@
 # - Add rules to options / flags
 # - filter subdatasets
 # - pylint, black + flake8
+# - add manual
+# - add on-the-fly reprojection for linked data
+# - add examples
+# - add testsuite
 
 import sys
 from copy import deepcopy
 from subprocess import PIPE
 from pathlib import Path
 import re
+import os
 
 import numpy as np
 
@@ -161,6 +166,7 @@ import cf_units
 import grass.script as gscript
 import grass.temporal as tgis
 from grass.pygrass.modules import Module, MultiModule, ParallelModuleQueue
+from grass.lib.raster import Rast_legal_bandref
 
 # from grass.temporal. import update_from_registered_maps
 from grass.temporal.register import register_maps_in_space_time_dataset
@@ -193,9 +199,11 @@ input_s = "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/05/15/S2A_MSIL1
 # Datasets may or may not contain subdatasets
 # Datasets may contain several layers
 # r.external registers all bands by default
+
+
 def legalize_name_string(string):
     """"""
-    legal_string = re.sub(r'[^\w\d-]+|[^\x00-\x7F]+|[ -/\\]+','_', string)
+    legal_string = re.sub(r"[^\w\d-]+|[^\x00-\x7F]+|[ -/\\]+", "_", string)
     return legal_string
 
 
@@ -210,7 +218,55 @@ def get_time_dimensions(meta):
     return time_dates
 
 
-def get_metadata(netcdf_metadata, subdataset=""):
+def parse_badref_conf(conf_file):
+    """Read user provided mapping of subdatasets / variables to band references
+    Return a dict with mapping, bands that are not mapped in this file are skipped
+    from import"""
+    if conf_file is None:
+        return None
+    bandref = {}
+    if not os.access(options["bandref"], os.R_OK):
+        gscript.fatal(
+            _(
+                "Cannot read configuration file <{conf_file}>".format(
+                    conf_file=conf_file
+                )
+            )
+        )
+
+    with open(conf_file, "") as c_file:
+        configuration = c_file.readlines()
+        for idx, line in enumerate(configuration):
+            if line.startswith("#") or line == "":
+                continue
+            elif len(line.split("=")) == 2:
+                line = line.split("=")
+                # Check if assigned band reference has legal a name
+                if Rast_legal_bandref(line[1]):
+                    bandref[line.split("=")[0]] = line.split("=")[1]
+                else:
+                    gscript.fatal(
+                        _(
+                            "Line {line_nr} in configuration file <{conf_file}> "
+                            "contains an illegal band name".format(
+                                line_nr=idx + 1, conf_file=conf_file
+                            )
+                        )
+                    )
+            else:
+                gscript.fatal(
+                    _(
+                        "Invalid format of band reference configuration in file <{}>".format(
+                            conf_file
+                        )
+                    )
+                )
+    print(bandref)
+
+    return bandref
+
+
+def get_metadata(netcdf_metadata, subdataset="", bandref=None):
     """Transform NetCDF metadata to GRASS metadata"""
     # title , history , institution , source , comment and references
     # netcdf_metadata = netcdf.GetMetadata()
@@ -277,14 +333,16 @@ def get_metadata(netcdf_metadata, subdataset=""):
             ),
         )
     )
+    if bandref is not None:
+        meta["bandref"] = bandref
 
-    # netcdf.GetRasterBand(1).GetMetadata()
     return meta
 
 
 def get_import_type(url, resample, flags_dict, netcdf):
     """Define import type ("r.in.gdal", "r.import", "r.external")"""
-    # Check projection match
+    use_warp_vrt = False
+    # Check if projections match
     try:
         projection_match = Module(
             "r.external", input=url, flags="j", stderr_=PIPE, stdout_=PIPE
@@ -294,7 +352,10 @@ def get_import_type(url, resample, flags_dict, netcdf):
         projection_match = False
     if flags_dict["l"]:
         if not projection_match and not flags_dict["o"]:
-            gscript.fatal(_("Cannot link input, projections do not match"))
+            gscript.warning(
+                _("Cannot link input directly, using a warped virtual raster")
+            )
+            use_warp_vrt = True
         import_type = "r.external"
     elif resample:
         if not projection_match:
@@ -304,9 +365,12 @@ def get_import_type(url, resample, flags_dict, netcdf):
             import_type = "r.in.gdal"
     else:
         if not projection_match and not flags_dict["o"]:
-            gscript.fatal(_("Projections do not match"))
+            gscript.warning(
+                _("Cannot link input directly, using a warped virtual raster")
+            )
+            use_warp_vrt = True
         import_type = "r.in.gdal"
-    return import_type
+    return import_type, use_warp_vrt
 
 
 # import or link data
@@ -359,9 +423,7 @@ def read_data(
     if is_subdataset:
         mapname_list.append(legalize_name_string(input_url.split(":")[-1]))
     for i in range(netcdf.RasterCount):
-        mapname = "_".join(
-            mapname_list + [time_dimensions[i].strftime("%Y_%m_%d")]
-        )
+        mapname = "_".join(mapname_list + [time_dimensions[i].strftime("%Y_%m_%d")])
         maps.append(mapname + "@" + gisenv["MAPSET"])
         new_import = deepcopy(import_mod)
         new_import(band=i + 1, output=mapname)
@@ -387,13 +449,30 @@ def read_data(
     return maps
 
 
-def create_vrt(subdataset, gisenv, index):
+def create_vrt(subdataset, gisenv, index, warp):
     """"""
-    vrt_dir = Path(gisenv['GISDBASE']).joinpath(gisenv['LOCATION_NAME'], gisenv['MAPSET'], "gdal")
+    vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
+        gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
+    )
     if not vrt_dir.is_dir():
         vrt_dir.mkdir()
-    vrt_name = str(vrt_dir.joinpath("netcdf_{}_{}".format(index,  gscript.tempname(12).lstrip("tmp_"))))
-    vrt = gdal.BuildVRT(vrt_name, subdataset.GetDescription())
+    vrt_name = str(
+        vrt_dir.joinpath(
+            "netcdf_{}_{}".format(index, gscript.tempname(12).lstrip("tmp_"))
+        )
+    )
+    if not warp:
+        vrt = gdal.BuildVRT(vrt_name, subdataset.GetDescription())
+    else:
+        vrt = gdal.Warp(
+            vrt_name,
+            subdataset.GetDescription(),
+            format="VRT",
+            outputType=gdal.GDT_Int16,
+            xRes=10,
+            yRes=10,
+            dstSRS="EPSG:25833",
+        )
     vrt = None
 
     return vrt_name
@@ -422,7 +501,8 @@ def main():
     for in_url in input:
         if not in_url.endswith(".nc"):
             gscript.fatal(_("<{}> does not seem to be a NetCDF file".format(in_url)))
-    # strds = options["output"]
+
+    bandref = parse_badref_conf(options["bandref"])
 
     # title = options["title"]
 
@@ -492,6 +572,10 @@ def main():
             # Check raster layers
             open_sds = [ncdf]
             sds = [("", "", 0)]
+
+        if flags["p"]:
+            print("\n".join(["{}|{}".format(in_url, sd[0]) for sd in sds]))
+            continue
 
         # Check global level
         # If sds > 1 loop over sds
