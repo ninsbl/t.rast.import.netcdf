@@ -150,11 +150,9 @@
 # - Allow user to choose what metadata to print
 #   (e.g. no data values, CF-tags, scaling, cloud coverage)
 #   maybe add some of it in the map name, so STRDS could be filtered based on that
+# - Improve parallel import (does not work for single layer subdatasets)
 # - Make use of more metadata (units, scaling)
 # - Add rules to options / flags
-# - pylint, black + flake8
-# - add manual
-# - add examples
 # - add testsuite
 
 import sys
