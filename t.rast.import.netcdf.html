@@ -1,17 +1,105 @@
 <h2>DESCRIPTION</h2>
 
-<em>t.rast.import.netcdf</em> adds two raster maps together.
-These raster maps are specified as parameters <b>araster</b> and <b>braster</b>.
+<em>t.rast.import.netcdf</em> imports content of one or more NetCDF files into a
+GRASS GIS Space Time Raster Dataset (STRDS). NetCDF files are expected to follow
+the CF-convention. Files not adhearing to those standards are likely to fail
+to import.
 
-This is an example of a GRASS GIS module implemeneted in Python.
+<p>
+Input URL(s) to NetCDF files can be provided in the <b>input</b> option as either
+a file, with one URL to a dataset per line, a comma-separated list of URLs or a
+single URL. "-" causes input to be taken from stdin.
+
+<p>
+The module works for both local and remote data (e.g. on a Thredds Server). Data
+can be imported (with <em>r.in.gdal</em> or <em>r.import</em>) or linked with
+<em>r.external</em>.
+
+<p>
+<em>t.rast.import.netcdf</em> can use GDALs Virtual Raster format (VRT) if data
+with Coordinate Reference systems that differ from the one of the current location
+are supposed to be linked only.
+
+<p>
+Starting with GRASS GIS version 8.0, different variables or subdatasets in a
+NetCDF file can be imported as "band reference" into one STRDS. To achieve this,
+a configuration file has to be provided in the <b>bandref</b> option, that maps
+subdatasets in the NetCDF file to GRASS GIS band references. Each line in that
+file must have the following format:
+<code>
+input_netcdf_subdataset=grass_gis_band_reference
+</code>
+The equal sign <i>=</i> is required.
+If a band references configuration file is provided, the import of subdatasets
+is limited to those subdatasets listed in that file.
+
+<h2>KNOWN ISSUES</h2>
+The VRT format is also used for NetCDF data
+that contains subdatasets, as import of those is currently not supported in
+<em>r.external</em>.
+
+<h2>REQUIREMENTS</h2>
+Support of band references is only available with GRASS GIS 8.0 or later.
+<em>t.rast.import.netcdf</em> uses the following non-standard Python modules:
+<ul>
+<li><a href="https://pypi.org/project/numpy">numpy</a></li>
+<li><a href="https://pypi.org/project/GDAL">gdal</a></li>
+<li><a href="https://pypi.org/project/cf-units">cf-units</a></li>
+</ul>
+
+<h2>EXAMPLES</h2>
+<h3>Link Sentinel-2 scenes from the Norwegian Ground Segment</h3>
+<div class="code"><pre>
+# Choose Scenes to import (see also m.crawl.thredds module)
+echo "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc
+https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T32VNL_20210228T201033_DTERRENGDATA.nc" > nc.txt
+
+# Create a band reference configuraton file
+echo "B1=S2_1
+B2=S2_2" > bandref.conf
+
+# Import data (link NetCDF files without downloading them)
+t.rast.import.netcdf -l input=nc.txt output=S2A title=S2A basename=S2A \
+description=S2A bandref=bandref.conf memory=2048 nprocs=2
+</pre></div>
+
+<h3>Import Norwegian Climate data</h3>
+<div class="code"><pre>
+# Choose dataset to import (see also m.crawl.thredds module)
+echo "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc
+https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T32VNL_20210228T201033_DTERRENGDATA.nc" > nc.txt
+
+# Create a band reference configuraton file
+echo "tg=temperature_avg
+tn=temperature_min" > bandref.conf
+
+# Import data
+t.rast.import.netcdf output=SeNorge title=SeNorge basename=SeNorge description=SeNorge \
+input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_1957/Archive/seNorge2018_2021.nc \
+bandref=bandref.conf memory=2048 nprocs=2
+</pre></div>
+
+<h3>Append to STRDS from previous imports</h3>
+<div class="code"><pre>
+# Choose dataset to import (see also m.crawl.thredds module)
+
+# Create a band reference configuraton file
+echo "tg=temperature_avg
+tn=temperature_min" > bandref.conf
+
+# Import data
+t.rast.import.netcdf output=SeNorge title=SeNorge basename=SeNorge description=SeNorge \
+input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2020/Archive/seNorge2018_2021.nc \
+bandref=bandref.conf memory=2048 nprocs=2 -a
+</pre></div>
 
 <h2>SEE ALSO</h2>
-
 <em>
-<a href="g.region.html">g.region</a>,
-<a href="r.mapcalc.html">r.mapcalc</a>
+<a href="t.rast.import.html">t.rast.import</a>
+<a href="m.crawl.thredds.html">m.crawl.thredds</a>,
+<a href="g.bands.html">g.bands</a>
+<a href="r.support.html">r.support</a>
 </em>
 
 <h2>AUTHORS</h2>
-
-Vaclav Petras, <a href="https://geospatial.ncsu.edu/geoforall/">NCSU GeoForAll Lab</a>
+Stefan Blumentrath, <a href="https://geospatial.ncsu.edu/geoforall/">NINA, Oslo</a>
