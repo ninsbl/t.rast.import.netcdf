@@ -147,6 +147,9 @@
 #%end
 
 # Todo:
+# - Allow user to choose what metadata to print
+#   (e.g. no data values, CF-tags, scaling, cloud coverage)
+#   maybe add some of it in the map name, so STRDS could be filtered based on that
 # - Make use of more metadata (units, scaling)
 # - Add rules to options / flags
 # - pylint, black + flake8
@@ -397,8 +400,10 @@ def get_import_type(url, resample, flags_dict, netcdf):
     if not projection_match and not flags_dict["o"]:
         if not resample:
             gscript.warning(
-                _("Projections do not match but no resampling method specified. "
-                "Using nearest neighbor method for resampling.")
+                _(
+                    "Projections do not match but no resampling method specified. "
+                    "Using nearest neighbor method for resampling."
+                )
             )
             resample = "nearest"
         if flags_dict["l"]:
@@ -408,8 +413,12 @@ def get_import_type(url, resample, flags_dict, netcdf):
             import_type = "r.external"
             if resample not in resample_dict["gdal"]:
                 gscript.fatal(
-                    _("For re-projection with gdalwarp only the following "
-                    "resample methods are allowed: {}".format(", ".join(list(resample_dict["gdal"].keys()))))
+                    _(
+                        "For re-projection with gdalwarp only the following "
+                        "resample methods are allowed: {}".format(
+                            ", ".join(list(resample_dict["gdal"].keys()))
+                        )
+                    )
                 )
                 resample = resample_dict["grass"][resample]
 
@@ -417,8 +426,12 @@ def get_import_type(url, resample, flags_dict, netcdf):
             import_type = "r.import"
             if resample not in resample_dict["grass"]:
                 gscript.fatal(
-                    _("For re-projection with r.import only the following "
-                    "resample methods are allowed: {}".format(", ".join(list(resample_dict["grass"].keys()))))
+                    _(
+                        "For re-projection with r.import only the following "
+                        "resample methods are allowed: {}".format(
+                            ", ".join(list(resample_dict["grass"].keys()))
+                        )
+                    )
                 )
             resample = resample_dict["grass"][resample]
     elif flags_dict["l"]:
@@ -451,12 +464,11 @@ def read_data(
     input_url = netcdf.GetDescription()
     is_subdataset = input_url.startswith("NETCDF")
     # Setup import module
-    vrt = create_vrt(netcdf, gisenv, index, resamp)
-    #print(input_url)
-    print(vrt)
     import_mod = Module(
         import_type,
-        input=input_url if not is_subdataset else create_vrt(netcdf, gisenv, index, resamp),
+        input=input_url
+        if not is_subdataset
+        else create_vrt(netcdf, gisenv, index, resamp),
         run_=False,
         finish_=False,
         flags=imp_flags,
@@ -544,8 +556,9 @@ def create_vrt(subdataset, gisenv, index, warp):
             ),
         )
     vrt = None
+    vrt = vrt_name
 
-    return vrt_name
+    return vrt
 
 
 def main():
@@ -676,7 +689,7 @@ def main():
             if strds_name not in existing_strds or (
                 gscript.overwrite and not flags["a"]
             ):
-                if not strds_name in modified_strds:
+                if strds_name not in modified_strds:
                     tgis.open_new_stds(
                         strds_name,
                         "strds",  # type
@@ -697,27 +710,29 @@ def main():
             if strds_name not in existing_strds:
                 existing_strds.append(strds_name)
 
-            import_module, warp = get_import_type(in_url, options["resample"], flags, sd)
+            import_module, warp = get_import_type(
+                in_url, options["resample"], flags, sd
+            )
 
-            modified_strds[strds_name].extend(read_data(
-                sd,
-                sd_metadata,
-                options,
-                import_module,
-                flags["o"],
-                flags["r"],
-                time_dimensions,
-                grass_env,
-                idx,
-                warp,
-            ))
+            modified_strds[strds_name].extend(
+                read_data(
+                    sd,
+                    sd_metadata,
+                    options,
+                    import_module,
+                    flags["o"],
+                    flags["r"],
+                    time_dimensions,
+                    grass_env,
+                    idx,
+                    warp,
+                )
+            )
 
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
         # tgis.register.register_map_object_list("strds", [tgis.RasterDataset(rmap + "@" + tgis.get_current_mapset()) for rmap in r_maps], tgis.SpaceTimeRasterDataset(strds + "@" + tgis.get_current_mapset())    )
-        tgis_strds = tgis.SpaceTimeRasterDataset(
-            strds_name + "@" + grass_env["MAPSET"]
-        )
+        tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
         print("registering maps", r_maps)
         # register_map_object_list("raster",
         # [tgis.RasterDataset(rmap) for rmap in r_maps], output_stds=tgis_strds, delete_empty=True)
