@@ -34,11 +34,6 @@
 #%end
 
 #%flag
-#% key: p
-#% description: Print file structure and exit
-#%end
-
-#%flag
 #% key: r
 #% description: Import only within current region
 #%end
@@ -74,39 +69,6 @@
 #% description: Name of the output space time raster dataset
 #%end
 
-#%option G_OPT_R_BASENAME_OUTPUT
-#% key: basename
-#% type: string
-#% required: no
-#% multiple: no
-#% label: Basename of the new generated output maps
-#% description: A numerical suffix or timestamp separated by an underscore will be attached to create a unique identifier
-#%end
-
-#%option
-#% key: title
-#% type: string
-#% required: no
-#% multiple: no
-#% description: Title of the new space time dataset
-#%end
-
-#%option
-#% key: description
-#% type: string
-#% required: no
-#% multiple: no
-#% description: Description of the new space time dataset
-#%end
-
-#%option
-#% key: subdatasets
-#% type: string
-#% required: no
-#% multiple: no
-#% description: Regular expression to filter subdatasets
-#%end
-
 #%option
 #% key: resample
 #% type: string
@@ -114,6 +76,15 @@
 #% multiple: no
 #% label: Resampling method when data is reprojected
 #% options: nearest, bilinear, bilinear_f, bicubic, bicubic_f, cubicspline, lanczos, lanczos_f, min, Q1, average, med, Q3, max, mode
+#%end
+
+#%option
+#% key: print
+#% type: string
+#% required: no
+#% multiple: no
+#% label: Print metadata and exit
+#% options: standard, tags, full, grass
 #%end
 
 #%option
@@ -151,7 +122,6 @@
 #   (e.g. no data values, CF-tags, scaling, cloud coverage)
 #   maybe add some of it in the map name, so STRDS could be filtered based on that
 # Allow to print subdataset information as bandref json (useful defining custom bandreferences)
-# - Improve parallel import (does not work for single layer subdatasets)
 # - Make use of more metadata (units, scaling)
 # - Add rules to options / flags
 # - add testsuite
@@ -162,6 +132,8 @@ from subprocess import PIPE
 from pathlib import Path
 import re
 import os
+from multiprocessing import Pool
+from itertools import chain
 
 import numpy as np
 
@@ -178,30 +150,6 @@ from grass.pygrass.modules import Module, MultiModule, ParallelModuleQueue
 from grass.temporal.register import register_maps_in_space_time_dataset
 from grass.temporal.datetime_math import datetime_to_grass_datetime_string
 
-# python3 t.rast.import.netcdf.py -l input=https://thredds.met.no/thredds/fileServer/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc output=test basename=testt title=test description=test
-"""
-options = {
-    "input": "https://thredds.met.no/thredds/fileServer/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc",  # "https://thredds.met.no/thredds/dodsC/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc", #"https://thredds.met.no/thredds/catalog/senorge/seNorge2_1/TEMP1d/catalog.html?dataset=senorge/seNorge2_1/TEMP1d/seNorge_v2_1_TEMP1d_grid_2015.nc",
-    "output": "test",  # Name of the output space time raster dataset
-    "basename": "test",  # Basename of the new generated output maps
-    "title": "test",  # Title of the new space time dataset
-    "description": "test",  # Description of the new space time dataset
-    "subdatasets": "*",  # Regular expression for filtering subdatasets
-    "memory": 300,
-}
-
-flags = {
-    "a": False,  # Append to existing STRDS
-    "r": False,  # Set the current region from the last map that was imported
-    "l": False,  # Link the raster files using r.external
-    "e": False,  # Extend location extents based on new dataset
-    "o": True,  # Override projection check (use current location's projection)
-}
-input_y = "https://thredds.met.no/thredds/fileServer/senorge/seNorge2_1/TEMP1d/seNorge_v2_1_TEMP1d_grid_2015.nc"
-input = "https://thredds.met.no/thredds/fileServer/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc"
-input_s = "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/05/15/S2A_MSIL1C_20210518T105621_NO300_R094_T32VMN_20210512T131440.nc"
-# "https://thredds.met.no/thredds/dodsC/ngcd/version_21.03/TG/type2/2020/12/NGCD_TG_type2_20201231.nc"
-"""
 # Datasets may or may not contain subdatasets
 # Datasets may contain several layers
 # r.external registers all bands by default
@@ -234,7 +182,7 @@ resample_dict = {
 
 
 def legalize_name_string(string):
-    """"""
+    """Replace conflicting characters with _"""
     legal_string = re.sub(r"[^\w\d-]+|[^\x00-\x7F]+|[ -/\\]+", "_", string)
     return legal_string
 
@@ -285,7 +233,7 @@ def parse_badref_conf(conf_file):
         for idx, line in enumerate(configuration.split("\n")):
             if line.startswith("#") or line == "":
                 continue
-            elif len(line.split("=")) == 2:
+            if len(line.split("=")) == 2:
                 line = line.split("=")
                 # Check if assigned band reference has legal a name
                 if Rast_legal_bandref(line[1]) == 1:
@@ -350,18 +298,8 @@ def get_metadata(netcdf_metadata, subdataset="", bandref=None):
     meta["units"] = netcdf_metadata.get(
         "{}#units".format(subdataset)
     )  # string Text to use for map data units
-    meta["vdatum"] = None  # string Text to use for map vertical datum
 
-    """
-        "TG#cell_methods": "time: mean within days",
-        "TG#standard_name": "air_temperature",
-        "TG#long_name": "daily mean temperature",
-        "TG#coordinates": "lon lat",
-        "TG#grid_mapping": "projection_laea",
-        "TG#prod_date": "2021-02-16",
-        "TG#software_release": "v0.1.0-beta",
-        "TG#_FillValue": "-999.98999",
-    """
+    meta["vdatum"] = None  # string Text to use for map vertical datum
     meta["source1"] = netcdf_metadata.get("NC_GLOBAL#source")
     meta["source2"] = netcdf_metadata.get("NC_GLOBAL#institution")
 
@@ -388,7 +326,7 @@ def check_projection_match(url):
     """Check if projections match"""
     try:
         projection_match = Module(
-            "r.external", input=url, flags="j", stderr_=PIPE, stdout_=PIPE
+            "r.in.gdal", input=url, flags="j", stderr_=PIPE, stdout_=PIPE
         )
         projection_match = True
     except Exception:
@@ -396,21 +334,26 @@ def check_projection_match(url):
     return projection_match
 
 
-def get_import_type(url, projection_match, resample, flags_dict, netcdf):
+def get_import_type(url, projection_match, resample, flags_dict):
     """Define import type ("r.in.gdal", "r.import", "r.external")"""
 
     if not projection_match and not flags_dict["o"]:
         if not resample:
             gscript.warning(
                 _(
-                    "Projections do not match but no resampling method specified. "
-                    "Using nearest neighbor method for resampling."
+                    "Projection for {} does not match the projection of the "
+                    "current location, but no resampling method has been specified. "
+                    "Using nearest neighbor method for resampling.".format(url)
                 )
             )
             resample = "nearest"
         if flags_dict["l"]:
             gscript.warning(
-                _("Cannot link input directly, using a warped virtual raster")
+                _(
+                    "Cannot link {} directly, using a warped virtual raster through GDAL".format(
+                        url
+                    )
+                )
             )
             import_type = "r.external"
             if resample not in resample_dict["gdal"]:
@@ -446,26 +389,24 @@ def get_import_type(url, projection_match, resample, flags_dict, netcdf):
 
 # import or link data
 def read_data(
-    netcdf,
+    input_url,
+    rastercount,
     metadata,
     options_dict,
     import_type,
-    ignore_crs,
-    crop_to_region,
+    flags_dict,
     time_dimensions,
     gisenv,
-    index,
     projection_match,
     resamp,
-    queue,
 ):
     """Import or link data and metadata"""
     maps = []
-    imp_flags = "o" if ignore_crs else ""
+    queue = []
+    imp_flags = "o" if flags_dict["o"] else ""
     # r.external [-feahvtr]
     # r.import [-enl]
     # r.in.gdal [-eflakcrp]
-    input_url = netcdf.GetDescription()
     is_subdataset = input_url.startswith("NETCDF")
     # Setup import module
     import_mod = Module(
@@ -473,7 +414,7 @@ def read_data(
         quiet=True,
         input=input_url
         if not is_subdataset
-        else create_vrt(netcdf, gisenv, index, resamp, projection_match),
+        else create_vrt(input_url, gisenv, resamp, projection_match),
         run_=False,
         finish_=False,
         flags=imp_flags,
@@ -490,7 +431,7 @@ def read_data(
         # import_mod.resolution = options["resolution"]
         # import_mod.resolution_value = options["resolution_value"]
     if import_type == "r.in.gdal":
-        import_mod.flags.r = crop_to_region
+        import_mod.flags.r = flags_dict["r"]
         # import_mod.offset = options["offset"]
         # import_mod.num_digits = options["num_digits"]
     # Setup metadata module
@@ -498,14 +439,17 @@ def read_data(
     # Setup timestamp module
     time_mod = Module("r.timestamp", quiet=True, run_=False, finish_=False)
     # Setup timestamp module
-    color_mod = Module("r.colors", quiet=True, color="viridis", run_=False, finish_=False)
+    color_mod = Module(
+        "r.colors", quiet=True, color="viridis", run_=False, finish_=False
+    )
     # Parallel module
-    mapname_list = [options_dict["basename"]]
+    mapname_list = []
     infile = Path(input_url).name.split(":")
     mapname_list.append(legalize_name_string(infile[0]))
     if is_subdataset:
         mapname_list.append(legalize_name_string(infile[1]))
-    for i in range(netcdf.RasterCount):
+    raster_bands = range(rastercount) if rastercount > 0 else [0]
+    for i in raster_bands:
         mapname = "_".join(mapname_list + [time_dimensions[i].strftime("%Y_%m_%d")])
         maps.append(mapname + "@" + gisenv["MAPSET"])
         new_import = deepcopy(import_mod)
@@ -519,40 +463,29 @@ def read_data(
         new_color = deepcopy(color_mod)
         new_color(map=mapname)
 
-        # print(new_import, new_meta, new_time)
-        mm = MultiModule(
-            module_list=[new_import, new_meta, new_time, new_color],
-            sync=True,
-            set_temp_region=False,
-        )
-        queue.append(mm)
-    # print(queue)
-    # queue.wait()
-    # proc_list = queue.get_finished_modules()
-    # print(proc_list)
-    # queue.get_num_run_procs()
+        queue.append([new_import, new_meta, new_time, new_color])
+
     return maps, queue
 
 
-def create_vrt(subdataset, gisenv, index, resample, equal_proj):
-    """"""
+def create_vrt(subdataset_url, gisenv, resample, equal_proj):
+    """Create a GDAL VRT for import"""
     vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
         gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
     )
-    sds_name = subdataset.GetDescription()
     if not vrt_dir.is_dir():
         vrt_dir.mkdir()
     vrt_name = str(
         vrt_dir.joinpath(
-            "netcdf_{}_{}.vrt".format(index, legalize_name_string(Path(sds_name).name))
+            "netcdf_{}.vrt".format(legalize_name_string(Path(subdataset_url).name))
         )
     )
     if equal_proj:
-        vrt = gdal.BuildVRT(vrt_name, sds_name)
+        vrt = gdal.BuildVRT(vrt_name, subdataset_url)
     else:
         vrt = gdal.Warp(
             vrt_name,
-            sds_name,
+            subdataset_url,
             options=gdal.WarpOptions(
                 format="VRT",
                 # outputType=gdal.GDT_Int16,
@@ -595,25 +528,24 @@ def main():
 
     bandref = parse_badref_conf(options["bandref"])
 
-    # title = options["title"]
+    # Get GRASS GIS environment info
+    grass_env = dict(gscript.gisenv())
 
-    # description = options["description"]
+    # Get projection of the current location
+    grass_env["LOCATION_PROJECTION"] = gscript.read_command(
+        "g.proj", flags="wf"
+    ).strip()
 
-    # resample = options["resample"]
-
-    grass_env = gscript.gisenv()
-    grass_env["LOCATION_PROJECTION"] = gscript.read_command("g.proj", flags="wf").strip()
-
+    # Initialize TGIS
     tgis.init()
 
     # Get existing STRDS
-    existing_strds = Module(
-        "t.list",
-        type="strds",
-        columns="name",
-        where="mapset = '{}'".format(grass_env["MAPSET"]),
-        stdout_=PIPE,
-    ).outputs.stdout.split("\n")
+    existing_strds = [
+        row["name"]
+        for row in tgis.list_stds.get_dataset_list(
+            type="strds", temporal_type="absolute", columns="name"
+        )[grass_env["MAPSET"]]
+    ]
 
     # Check inputs
     # URL or file readable
@@ -622,19 +554,21 @@ def main():
 
     modified_strds = {}
     queued_modules = []
+    queueing_input = []
+    inputs = {}
 
     for in_url in input:
-
         # Check if file exists and readable
         try:
             ncdf = gdal.Open(in_url)
         except FileNotFoundError:
             gscript.fatal(_("Could not open <{}>".format(in_url)))
 
+        # Get global metadata
         ncdf_metadata = ncdf.GetMetadata()
 
+        # Get CF version
         cf_version = ncdf_metadata.get("NC_GLOBAL#Conventions")
-        # [key for key in metadata.keys() if key in metadata_y.keys()]
         if not cf_version.upper().startswith("CF"):
             gscript.warning(
                 _(
@@ -647,57 +581,78 @@ def main():
         # except Exception:
         #     creation_date = None
 
-        # Check for subdatasets
-        # sds = ncdf.GetSubDatasets()
-
-        # raster_layers = ncdf.RasterCount
-
         # Sub datasets containing variables have 3 dimensions (x,y,z)
         sds = [
-            (sds[0].split(":")[-1], sds[0], len(sds[1].split(" ")[0].split("x")))
+            # SDS_ID, SDS_url, SDS_dimension
+            [sds[0].split(":")[-1], sds[0], len(sds[1].split(" ")[0].split("x"))]
             for sds in ncdf.GetSubDatasets()
             if len(sds[1].split(" ")[0].split("x")) == 3
         ]
+
+        # Filter based on bandref if provided
         if bandref is not None:
             sds = [s for s in sds if s[0] in bandref.keys()]
 
+        # Open subdatasets to get metadata
         if len(sds) > 0:  # and ncdf.RasterCount == 0:
-            open_sds = [gdal.Open(s[1]) for s in sds]
+            sds = [[gdal.Open(s[1])] + s for s in sds]
         elif len(sds) == 0 and ncdf.RasterCount == 0:
-            gscript.fatal(_("No data to import"))
+            gscript.warning(_("No data to import from file {}").format(in_url))
         else:
             # Check raster layers
-            open_sds = [ncdf]
-            sds = [("", "", 0)]
+            sds = [ncdf, "", "", 0]
 
-        if flags["p"]:
-            print("\n".join(["{}|{}".format(in_url, sd[0]) for sd in sds]))
-            continue
+        # Collect relevant inputs in a dictionary
+        inputs[in_url] = {}
+        inputs[in_url]["sds"] = [
+            {
+                "id": sd[1],
+                "url": sd[0].GetDescription(),
+                "metadata": get_metadata(sd[0].GetMetadata(), sd[1], bandref),
+                "extended_metadata": sd[0].GetMetadata(),
+                "time_dimensions": get_time_dimensions(sd[0].GetMetadata()),
+                "rastercount": sd[0].RasterCount,
+            }
+            for sd in sds
+        ]
 
-        print(sds[0][1])
-        projection_match = check_projection_match(sds[0][1])
+        # Close open GDAL datasets
+        sds = None
 
+    if options["print"] in ["standard"]:
+        # ["|".join([[s["url"], s["id"]] + s["extended_metadata"].values])
+        # \n".join(
+        print(
+            "\n".join(
+                [
+                    sd["id"]
+                    for sd in chain.from_iterable([i["sds"] for i in inputs.values()])
+                ]
+            )
+        )
+        # print("\n".join([sd["id"] for sd in [s for s in [inputs[i]["sds"] for i in inputs]]]))
+        sys.exit(0)
 
-        # Check global level
-        # If sds > 1 loop over sds
+    # Create STRDS if required
+    with Pool(processes=int(options["nprocs"])) as pool:
+        # Check (only first subdataset) if projections match
+        projection_match = pool.map(
+            check_projection_match, [inputs[i]["sds"][0]["url"] for i in inputs]
+        )
 
+    for idx, url in enumerate(inputs):
+        inputs[url]["proj_match"] = projection_match[idx]
 
-        # Here loop over subdatasets
-        for idx, sd in enumerate(open_sds):
+    for sds in inputs.values():
 
-            sd_metadata = sd.GetMetadata()
-            # print(sd_metadata)
-            #
+        # Here loop over subdatasets ()
+        for sd in sds["sds"]:
+
             strds_name = (
-                "{}_{}".format(options["output"], sds[idx][0])
-                if sds[idx][0] and not bandref
+                "{}_{}".format(options["output"], sd["id"])
+                if sd["id"] and not bandref
                 else options["output"]
             )
-
-            time_dimensions = get_time_dimensions(sd_metadata)
-
-            print(sd_metadata)
-            sd_metadata = get_metadata(sd_metadata, sds[idx][0], bandref)
 
             # Append if exists and overwrite allowed (do not update metadata)
             if strds_name not in existing_strds or (
@@ -708,8 +663,8 @@ def main():
                         strds_name,
                         "strds",  # type
                         "absolute",  # temporaltype
-                        sd_metadata["title"],
-                        sd_metadata["description"],
+                        sd["metadata"]["title"],
+                        sd["metadata"]["description"],
                         "mean",  # semanticstype
                         None,  # dbif
                         gscript.overwrite,
@@ -725,28 +680,40 @@ def main():
                 existing_strds.append(strds_name)
 
             import_module, resample = get_import_type(
-                in_url, projection_match, options["resample"], flags, sd
+                sd["url"], sds["proj_match"], options["resample"], flags
             )
-            print(import_module, resample)
-            r_maps, queued_modules = read_data(
-                    sd,
-                    sd_metadata,
+            queueing_input.append(
+                (
+                    sd["url"],
+                    sd["rastercount"],
+                    sd["metadata"],
                     options,
                     import_module,
-                    flags["o"],
-                    flags["r"],
-                    time_dimensions,
+                    flags,
+                    sd["time_dimensions"],
                     grass_env,
-                    idx,
-                    projection_match,
+                    sds["proj_match"],
                     resample,
-                    queued_modules,
                 )
-            print("Modules added")
-        modified_strds[strds_name].extend(r_maps)
+            )
+
+    # This is a time consuming part due to building of VRT files
+    # should be parallelised with multiprocessing
+    with Pool(processes=int(options["nprocs"])) as pool:
+        queueing_results = pool.starmap(read_data, queueing_input)
+    for qres in queueing_results:
+        modified_strds[strds_name].extend(qres[0])
+        queued_modules.extend(qres[1])
 
     queue = ParallelModuleQueue(nprocs=options["nprocs"])
-    [queue.put(mm) for mm in queued_modules]
+    for mm in queued_modules:
+        queue.put(
+            MultiModule(
+                module_list=mm,
+                sync=True,
+                set_temp_region=False,
+            )
+        )
     queue.wait()
 
     for strds_name, r_maps in modified_strds.items():
@@ -765,46 +732,6 @@ def main():
         )
 
         tgis_strds.update_from_registered_maps(dbif=None)
-
-    {
-        "cell_methods": "time: mean within days",
-        "coordinates": "lon lat",
-        "grid_mapping": "projection_laea",
-        "long_name": "daily mean temperature",
-        "NETCDF_DIM_time": "44193.75",
-        "NETCDF_VARNAME": "TG",
-        "prod_date": "2021-02-16",
-        "software_release": "v0.1.0-beta",
-        "standard_name": "air_temperature",
-        "units": "K",
-        "_FillValue": "-999.98999",
-    }
-
-    {
-        "NC_GLOBAL#comment": "Our open data are licensed under Norwegian Licence for Open Government Data (NLOD) or a Creative Commons Attribution 4.0 International License at your preference. Credit should be given to The Norwegian Meteorological institute, shortened “MET Norway”, as the source of data.",
-        "NC_GLOBAL#contact": "http://copernicus-support.ecmwf.int",
-        "NC_GLOBAL#Conventions": "CF-1.7",
-        "NC_GLOBAL#creation_date": "2021-03-19",
-        "NC_GLOBAL#history": "March 2021 creation",
-        "NC_GLOBAL#keywords": "Fennoscandia, land, observational gridded dataset, daily mean temperature, past",
-        "NC_GLOBAL#license": "https://www.met.no/en/free-meteorological-data/Licensing-and-crediting",
-        "NC_GLOBAL#project": "C3S 311a Lot4",
-        "TG#cell_methods": "time: mean within days",
-        "TG#coordinates": "lon lat",
-        "TG#grid_mapping": "projection_laea",
-        "TG#long_name": "daily mean temperature",
-        "TG#prod_date": "2021-02-16",
-        "TG#software_release": "v0.1.0-beta",
-        "TG#standard_name": "air_temperature",
-        "TG#units": "K",
-        "TG#_FillValue": "-999.98999",
-        # 'time#axis': 'T',
-        # 'time#bounds': 'time_bounds',
-        # 'time#calendar': 'standard',
-        # 'time#long_name': 'time',
-        # 'time#standard_name': 'time',
-        # 'time#units': 'days since 1900-01-01 00:00:00',
-    }
 
     return 0
 
