@@ -150,6 +150,7 @@
 # - Allow user to choose what metadata to print
 #   (e.g. no data values, CF-tags, scaling, cloud coverage)
 #   maybe add some of it in the map name, so STRDS could be filtered based on that
+# Allow to print subdataset information as bandref json (useful defining custom bandreferences)
 # - Improve parallel import (does not work for single layer subdatasets)
 # - Make use of more metadata (units, scaling)
 # - Add rules to options / flags
@@ -383,10 +384,8 @@ def get_metadata(netcdf_metadata, subdataset="", bandref=None):
     return meta
 
 
-def get_import_type(url, resample, flags_dict, netcdf):
-    """Define import type ("r.in.gdal", "r.import", "r.external")"""
-
-    # Check if projections match
+def check_projection_match(url):
+    """Check if projections match"""
     try:
         projection_match = Module(
             "r.external", input=url, flags="j", stderr_=PIPE, stdout_=PIPE
@@ -394,6 +393,11 @@ def get_import_type(url, resample, flags_dict, netcdf):
         projection_match = True
     except Exception:
         projection_match = False
+    return projection_match
+
+
+def get_import_type(url, projection_match, resample, flags_dict, netcdf):
+    """Define import type ("r.in.gdal", "r.import", "r.external")"""
 
     if not projection_match and not flags_dict["o"]:
         if not resample:
@@ -418,7 +422,7 @@ def get_import_type(url, resample, flags_dict, netcdf):
                         )
                     )
                 )
-                resample = resample_dict["grass"][resample]
+            resample = resample_dict["gdal"][resample]
 
         else:
             import_type = "r.import"
@@ -451,7 +455,9 @@ def read_data(
     time_dimensions,
     gisenv,
     index,
+    projection_match,
     resamp,
+    queue,
 ):
     """Import or link data and metadata"""
     maps = []
@@ -464,9 +470,10 @@ def read_data(
     # Setup import module
     import_mod = Module(
         import_type,
+        quiet=True,
         input=input_url
         if not is_subdataset
-        else create_vrt(netcdf, gisenv, index, resamp),
+        else create_vrt(netcdf, gisenv, index, resamp, projection_match),
         run_=False,
         finish_=False,
         flags=imp_flags,
@@ -487,11 +494,12 @@ def read_data(
         # import_mod.offset = options["offset"]
         # import_mod.num_digits = options["num_digits"]
     # Setup metadata module
-    meta_mod = Module("r.support", run_=False, finish_=False, **metadata)
+    meta_mod = Module("r.support", quiet=True, run_=False, finish_=False, **metadata)
     # Setup timestamp module
-    time_mod = Module("r.timestamp", run_=False, finish_=False)
-    # r.timestamp map=soils date='18 feb 2005 10:30:00/20 jul 2007 20:30:00'
-    queue = ParallelModuleQueue(nprocs=options_dict["nprocs"])
+    time_mod = Module("r.timestamp", quiet=True, run_=False, finish_=False)
+    # Setup timestamp module
+    color_mod = Module("r.colors", quiet=True, color="viridis", run_=False, finish_=False)
+    # Parallel module
     mapname_list = [options_dict["basename"]]
     infile = Path(input_url).name.split(":")
     mapname_list.append(legalize_name_string(infile[0]))
@@ -508,23 +516,25 @@ def read_data(
         new_time(
             map=mapname, date=datetime_to_grass_datetime_string(time_dimensions[i])
         )
+        new_color = deepcopy(color_mod)
+        new_color(map=mapname)
+
         # print(new_import, new_meta, new_time)
         mm = MultiModule(
-            module_list=[new_import, new_meta, new_time],
+            module_list=[new_import, new_meta, new_time, new_color],
             sync=True,
             set_temp_region=False,
         )
-        queue.put(mm)
-    queue.wait()
+        queue.append(mm)
     # print(queue)
     # queue.wait()
     # proc_list = queue.get_finished_modules()
     # print(proc_list)
     # queue.get_num_run_procs()
-    return maps
+    return maps, queue
 
 
-def create_vrt(subdataset, gisenv, index, warp):
+def create_vrt(subdataset, gisenv, index, resample, equal_proj):
     """"""
     vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
         gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
@@ -537,7 +547,7 @@ def create_vrt(subdataset, gisenv, index, warp):
             "netcdf_{}_{}.vrt".format(index, legalize_name_string(Path(sds_name).name))
         )
     )
-    if warp is None or warp == "":
+    if equal_proj:
         vrt = gdal.BuildVRT(vrt_name, sds_name)
     else:
         vrt = gdal.Warp(
@@ -548,9 +558,9 @@ def create_vrt(subdataset, gisenv, index, warp):
                 # outputType=gdal.GDT_Int16,
                 # xRes=10,
                 # yRes=10,
-                dstSRS=gscript.read_command("g.proj", flags="wf").strip(),
+                dstSRS=gisenv["LOCATION_PROJECTION"],
                 # srcNodata=1,
-                resampleAlg="near",
+                resampleAlg=resample,
             ),
         )
     vrt = None
@@ -592,6 +602,7 @@ def main():
     # resample = options["resample"]
 
     grass_env = gscript.gisenv()
+    grass_env["LOCATION_PROJECTION"] = gscript.read_command("g.proj", flags="wf").strip()
 
     tgis.init()
 
@@ -610,6 +621,7 @@ def main():
     # get basename from existing STRDS
 
     modified_strds = {}
+    queued_modules = []
 
     for in_url in input:
 
@@ -649,7 +661,7 @@ def main():
         if bandref is not None:
             sds = [s for s in sds if s[0] in bandref.keys()]
 
-        if len(sds) > 0 and ncdf.RasterCount == 0:
+        if len(sds) > 0:  # and ncdf.RasterCount == 0:
             open_sds = [gdal.Open(s[1]) for s in sds]
         elif len(sds) == 0 and ncdf.RasterCount == 0:
             gscript.fatal(_("No data to import"))
@@ -662,11 +674,15 @@ def main():
             print("\n".join(["{}|{}".format(in_url, sd[0]) for sd in sds]))
             continue
 
+        print(sds[0][1])
+        projection_match = check_projection_match(sds[0][1])
+
+
         # Check global level
         # If sds > 1 loop over sds
 
-        # Here loop over subdatasets
 
+        # Here loop over subdatasets
         for idx, sd in enumerate(open_sds):
 
             sd_metadata = sd.GetMetadata()
@@ -680,7 +696,7 @@ def main():
 
             time_dimensions = get_time_dimensions(sd_metadata)
 
-            # print(sd_metadata)
+            print(sd_metadata)
             sd_metadata = get_metadata(sd_metadata, sds[idx][0], bandref)
 
             # Append if exists and overwrite allowed (do not update metadata)
@@ -708,12 +724,11 @@ def main():
             if strds_name not in existing_strds:
                 existing_strds.append(strds_name)
 
-            import_module, warp = get_import_type(
-                in_url, options["resample"], flags, sd
+            import_module, resample = get_import_type(
+                in_url, projection_match, options["resample"], flags, sd
             )
-
-            modified_strds[strds_name].extend(
-                read_data(
+            print(import_module, resample)
+            r_maps, queued_modules = read_data(
                     sd,
                     sd_metadata,
                     options,
@@ -723,15 +738,22 @@ def main():
                     time_dimensions,
                     grass_env,
                     idx,
-                    warp,
+                    projection_match,
+                    resample,
+                    queued_modules,
                 )
-            )
+            print("Modules added")
+        modified_strds[strds_name].extend(r_maps)
+
+    queue = ParallelModuleQueue(nprocs=options["nprocs"])
+    [queue.put(mm) for mm in queued_modules]
+    queue.wait()
 
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
         # tgis.register.register_map_object_list("strds", [tgis.RasterDataset(rmap + "@" + tgis.get_current_mapset()) for rmap in r_maps], tgis.SpaceTimeRasterDataset(strds + "@" + tgis.get_current_mapset())    )
         tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
-        print("registering maps", r_maps)
+        # print("registering maps", r_maps)
         # register_map_object_list("raster",
         # [tgis.RasterDataset(rmap) for rmap in r_maps], output_stds=tgis_strds, delete_empty=True)
 
