@@ -625,7 +625,10 @@ def main():
         print(
             "\n".join(
                 [
-                    sd["id"]
+                    "|".join(
+                        [sd["id"], sd["url"], str(sd["rastercount"])]
+                        + list(map(str, sd["extended_metadata"].values()))
+                    )
                     for sd in chain.from_iterable([i["sds"] for i in inputs.values()])
                 ]
             )
