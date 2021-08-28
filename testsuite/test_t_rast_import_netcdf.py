@@ -3,11 +3,11 @@
 """
 MODULE:    Test of t.rast.import.netcdf
 
-AUTHOR(S): Vaclav Petras <ninsbl gmail com>
+AUTHOR(S): Stefan Blumentrath <stefan dot blumentrath at nina dot no>
 
 PURPOSE:   Test of t.rast.import.netcdf (example of a simple test of a module)
 
-COPYRIGHT: (C) 2020 by Vaclav Petras and the GRASS Development Team
+COPYRIGHT: (C) 2021 by Stefan Blumentrath and the GRASS Development Team
 
 This program is free software under the GNU General Public
 License (>=v2). Read the file COPYING that comes with GRASS
@@ -28,11 +28,17 @@ def get_raster_min_max(raster_map):
 class TestWatershed(TestCase):
     """The main (and only) test case for the t.rast.import.netcdf module"""
 
-    # Raster maps be used as inputs (they exist in the NC SPM sample location)
-    test_input_1 = "elevation"
-    test_input_2 = "zipcodes"
-    # Raster map name be used as output
-    output = "plus_result"
+    # NetCDF URL to be used as input for sentinel data test
+    input_sentinel = ["https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc",
+    "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T32VNL_20210228T201033_DTERRENGDATA.nc"]
+    # STRDS to be used as output for sentinel data test
+    output_sentinel = "S2"
+    # NetCDF URL to be used as input for climate data test
+    input_climate = "https://thredds.met.no/thredds/fileServer/senorge/seNorge_1957/Archive/seNorge2018_2021.nc"
+    # Input file name
+    input_file = "url_list.txt"
+    # STRDS to be used as output for climate data test
+    output_climate = "se_norge"
 
     @classmethod
     def setUpClass(cls):
@@ -62,19 +68,107 @@ class TestWatershed(TestCase):
         Since we remove the raster map after running each test function,
         we can reuse the same name for all the test functions.
         """
-        self.runModule("g.remove", flags="f", type="raster", name=[self.output])
+        for strds in [self.output_climate, self.output_sentinel]:
+            try:
+                self.runModule("t.remove", flags="rf", name=strds)
+            except Exception:
+                pass
 
-    def test_output_created(self):
+    def test_sentinel_output_created(self):
+        """Check that the output is created"""
+        # run the import module
+        self.assertModule(
+            "t.rast.import.netcdf",
+            flags="lo",
+            input=self.input_sentinel[0],
+            output=self.output_sentinel,
+            bandref="bandref_2.conf",
+            memory=2048,
+            nprocs=2,
+        )
+        # check to see if output is in mapset
+        # Adjust to STRDS
+        # self.assertRasterExists(self.output, msg="Output was not created")
+
+    def test_sentinel_output_appended(self):
+        """Check that the output is created"""
+        # run the import module
+        self.assertModule(
+            "t.rast.import.netcdf",
+            flags="lo",
+            input=self.input_sentinel[0],
+            output=self.output_sentinel,
+            bandref="bandref_2.conf",
+            memory=2048,
+            nprocs=2,
+        )
+        self.assertModule(
+            "t.rast.import.netcdf",
+            flags="loa",
+            input=self.input_sentinel[1],
+            output=self.output_sentinel,
+            bandref="bandref_2.conf",
+            memory=2048,
+            nprocs=2,
+        )
+
+    def test_sentinel_input_comma_separated(self):
+        """Check that the output is created"""
+        self.assertModule(
+            "t.rast.import.netcdf",
+            flags="lo",
+            input=",".join(self.input_sentinel),
+            output=self.output_sentinel,
+            bandref="bandref_2.conf",
+            memory=2048,
+            nprocs=2,
+        )
+
+    def test_sentinel_input_file(self):
+        """Check that the output is created"""
+        with open(input_file, "w") as f:
+            f.write("\n".join(self.input_sentinel))
+        self.assertModule(
+            "t.rast.import.netcdf",
+            flags="lo",
+            input=self.input_file,
+            output=self.output_sentinel,
+            bandref="bandref_2.conf",
+            memory=2048,
+            nprocs=2,
+        )
+
+<h3>Append to STRDS from previous imports</h3>
+<div class="code"><pre>
+# Choose dataset to import (see also m.crawl.thredds module)
+
+# Create a band reference configuraton file
+echo "tg=temperature_avg
+tn=temperature_min" > bandref.conf
+
+# Import data
+t.rast.import.netcdf output=SeNorge bandref=bandref.conf memory=2048 nprocs=2 -a \
+input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2020/Archive/seNorge2018_2021.nc \
+</pre></div>
+
+# Create a band reference configuraton file
+echo "tg=temperature_avg
+tn=temperature_min" > bandref.conf
+
+    def test_climate_output_created(self):
         """Check that the output is created"""
         # run the watershed module
         self.assertModule(
             "t.rast.import.netcdf",
-            a_input=self.test_input_1,
-            b_input=self.test_input_2,
-            output=self.output,
+            flags="lo",
+            input=self.input_climate,
+            output=self.output_climate,
+            bandref="bandref_sn.conf",
+            memory=2048,
+            nprocs=2,
         )
-        # check to see if output is in mapset
-        self.assertRasterExists(self.output, msg="Output was not created")
+
+
 
     def test_missing_parameter(self):
         """Check that the module fails when parameters are missing
@@ -126,6 +220,21 @@ class TestWatershed(TestCase):
             reference_max,
             msg="Output exceeds the values computed from inputs",
         )
+
+
+
+<h3>Append to STRDS from previous imports</h3>
+<div class="code"><pre>
+# Choose dataset to import (see also m.crawl.thredds module)
+
+# Create a band reference configuraton file
+echo "tg=temperature_avg
+tn=temperature_min" > bandref.conf
+
+# Import data
+t.rast.import.netcdf output=SeNorge bandref=bandref.conf memory=2048 nprocs=2 -a \
+input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2020/Archive/seNorge2018_2021.nc \
+</pre></div>
 
 
 if __name__ == "__main__":
