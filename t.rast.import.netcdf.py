@@ -31,27 +31,32 @@
 #%flag
 #% key: a
 #% description: Append to STRDS
+#% guisection: Settings
 #%end
 
 #%flag
 #% key: r
 #% description: Import only within current region
+#% guisection: Settings
 #%end
 
 #%flag
 #% key: l
 #% description: Link the raster files using r.external
+#% guisection: Settings
 #%end
 
 #%flag
 #% key: e
 #% description: Extend location extents based on new dataset
+#% guisection: Settings
 #%end
 
 #%flag
 #% key: o
 #% label: Override projection check (use current location's projection)
 #% description: Assume that the dataset has same projection as the current location
+#% guisection: Settings
 #%end
 
 #%option G_OPT_F_INPUT
@@ -63,8 +68,18 @@
 #% description: URL or name of input netcdf-file ("-" = stdin)
 #%end
 
+#%option G_OPT_F_INPUT
+#% key: bandref
+#% type: string
+#% required: no
+#% multiple: no
+#% key_desc: Input file with bandreference configuration ("-" = stdin)
+#% description: File with mapping of variables or subdatasets to band references
+#% guisection: Settings
+#%end
+
 #%option G_OPT_STRDS_OUTPUT
-#% required: yes
+#% required: no
 #% multiple: no
 #% description: Name of the output space time raster dataset
 #%end
@@ -76,6 +91,7 @@
 #% multiple: no
 #% label: Resampling method when data is reprojected
 #% options: nearest, bilinear, bilinear_f, bicubic, bicubic_f, cubicspline, lanczos, lanczos_f, min, Q1, average, med, Q3, max, mode
+#% guisection: Settings
 #%end
 
 #%option
@@ -85,6 +101,7 @@
 #% multiple: no
 #% label: Print metadata and exit
 #% options: standard, tags, full, grass
+#% guisection: Print
 #%end
 
 #%option
@@ -96,6 +113,7 @@
 #% label: Maximum memory to be used (in MB)
 #% description: Cache size for raster rows
 #% answer: 300
+#% guisection: Settings
 #%end
 
 #%option
@@ -106,15 +124,18 @@
 #% key_desc: Number of cores
 #% label: Number of cores to use during import
 #% answer: 1
+#% guisection: Settings
 #%end
 
-#%option G_OPT_F_INPUT
-#% key: bandref
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: Input file with bandreference configuration ("-" = stdin)
-#% description: File with mapping of variables or subdatasets to band references
+#%option G_OPT_F_SEP
+#% guisection: Settings
+#%end
+
+#%rules
+#% excludes: -o,resample
+#% excludes: -l,-r
+#% excludes: print,output
+#% required: print,output
 #%end
 
 # Todo:
@@ -123,7 +144,6 @@
 #   maybe add some of it in the map name, so STRDS could be filtered based on that
 # Allow to print subdataset information as bandref json (useful defining custom bandreferences)
 # - Make use of more metadata (units, scaling)
-# - Add rules to options / flags
 # - add testsuite
 
 import sys
@@ -506,6 +526,7 @@ def main():
     """run the main workflow"""
 
     input = options["input"].split(",")
+    sep = gscript.utils.separator(options["separator"])
 
     if len(input) == 1:
         if input[0] == "-":
@@ -625,7 +646,7 @@ def main():
         print(
             "\n".join(
                 [
-                    "|".join(
+                    sep.join(
                         [sd["id"], sd["url"], str(sd["rastercount"])]
                         + list(map(str, sd["extended_metadata"].values()))
                     )
