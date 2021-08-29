@@ -100,7 +100,7 @@
 #% required: no
 #% multiple: no
 #% label: Print metadata and exit
-#% options: standard, tags, full, grass
+#% options: extended, grass
 #% guisection: Print
 #%end
 
@@ -209,6 +209,8 @@ def legalize_name_string(string):
 
 def get_time_dimensions(meta):
     """Extracts netcdf-cf compliant time dimensions from metadata using UDUNITS2"""
+    if "NETCDF_DIM_time_VALUES" not in meta:
+        return None
     time_values = np.fromstring(
         meta["NETCDF_DIM_time_VALUES"].strip("{").strip("}"), sep=",", dtype=np.float
     )
@@ -419,6 +421,7 @@ def read_data(
     gisenv,
     projection_match,
     resamp,
+    strds_name,
 ):
     """Import or link data and metadata"""
     maps = []
@@ -485,7 +488,7 @@ def read_data(
 
         queue.append([new_import, new_meta, new_time, new_color])
 
-    return maps, queue
+    return strds_name, maps, queue
 
 
 def create_vrt(subdataset_url, gisenv, resample, equal_proj):
@@ -561,12 +564,14 @@ def main():
     tgis.init()
 
     # Get existing STRDS
-    existing_strds = [
-        row["name"]
-        for row in tgis.list_stds.get_dataset_list(
-            type="strds", temporal_type="absolute", columns="name"
-        )[grass_env["MAPSET"]]
-    ]
+    dataset_list = tgis.list_stds.get_dataset_list(
+        type="strds", temporal_type="absolute", columns="name"
+    )
+    existing_strds = (
+        [row["name"] for row in dataset_list[grass_env["MAPSET"]]]
+        if grass_env["MAPSET"] in dataset_list
+        else []
+    )
 
     # Check inputs
     # URL or file readable
@@ -629,26 +634,39 @@ def main():
             {
                 "id": sd[1],
                 "url": sd[0].GetDescription(),
-                "metadata": get_metadata(sd[0].GetMetadata(), sd[1], bandref),
+                "grass_metadata": get_metadata(sd[0].GetMetadata(), sd[1], bandref),
                 "extended_metadata": sd[0].GetMetadata(),
                 "time_dimensions": get_time_dimensions(sd[0].GetMetadata()),
                 "rastercount": sd[0].RasterCount,
             }
             for sd in sds
+            if "NETCDF_DIM_time_VALUES" in sd[0].GetMetadata()
         ]
 
         # Close open GDAL datasets
         sds = None
 
-    if options["print"] in ["standard"]:
+    if options["print"] in ["grass", "extended"]:
         # ["|".join([[s["url"], s["id"]] + s["extended_metadata"].values])
         # \n".join(
+        print_type = "{}_metadata".format(options["print"])
+        print(
+            sep.join(
+                ["id", "url", "rastercount", "time_dimensions"]
+                + list(next(iter(inputs.values()))["sds"][0][print_type].keys())
+            )
+        )
         print(
             "\n".join(
                 [
                     sep.join(
-                        [sd["id"], sd["url"], str(sd["rastercount"])]
-                        + list(map(str, sd["extended_metadata"].values()))
+                        [
+                            sd["id"],
+                            sd["url"],
+                            str(sd["rastercount"]),
+                            str(len(sd["time_dimensions"])),
+                        ]
+                        + list(map(str, sd[print_type].values()))
                     )
                     for sd in chain.from_iterable([i["sds"] for i in inputs.values()])
                 ]
@@ -657,15 +675,19 @@ def main():
         # print("\n".join([sd["id"] for sd in [s for s in [inputs[i]["sds"] for i in inputs]]]))
         sys.exit(0)
 
-    # Create STRDS if required
-    with Pool(processes=int(options["nprocs"])) as pool:
-        # Check (only first subdataset) if projections match
-        projection_match = pool.map(
-            check_projection_match, [inputs[i]["sds"][0]["url"] for i in inputs]
-        )
+    # Check if projections match
+    if flags["o"]:
+        for i in inputs:
+            inputs[i]["proj_match"] = True
+    else:
+        with Pool(processes=int(options["nprocs"])) as pool:
+            # Check (only first subdataset) if projections match
+            projection_match = pool.map(
+                check_projection_match, [inputs[i]["sds"][0]["url"] for i in inputs]
+            )
 
-    for idx, url in enumerate(inputs):
-        inputs[url]["proj_match"] = projection_match[idx]
+        for idx, url in enumerate(inputs):
+            inputs[url]["proj_match"] = projection_match[idx]
 
     for sds in inputs.values():
 
@@ -687,8 +709,8 @@ def main():
                         strds_name,
                         "strds",  # type
                         "absolute",  # temporaltype
-                        sd["metadata"]["title"],
-                        sd["metadata"]["description"],
+                        sd["grass_metadata"]["title"],
+                        sd["grass_metadata"]["description"],
                         "mean",  # semanticstype
                         None,  # dbif
                         gscript.overwrite,
@@ -710,7 +732,7 @@ def main():
                 (
                     sd["url"],
                     sd["rastercount"],
-                    sd["metadata"],
+                    sd["grass_metadata"],
                     options,
                     import_module,
                     flags,
@@ -718,6 +740,7 @@ def main():
                     grass_env,
                     sds["proj_match"],
                     resample,
+                    strds_name,
                 )
             )
 
@@ -726,8 +749,8 @@ def main():
     with Pool(processes=int(options["nprocs"])) as pool:
         queueing_results = pool.starmap(read_data, queueing_input)
     for qres in queueing_results:
-        modified_strds[strds_name].extend(qres[0])
-        queued_modules.extend(qres[1])
+        modified_strds[qres[0]].extend(qres[1])
+        queued_modules.extend(qres[2])
 
     queue = ParallelModuleQueue(nprocs=options["nprocs"])
     for mm in queued_modules:
@@ -742,11 +765,7 @@ def main():
 
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
-        # tgis.register.register_map_object_list("strds", [tgis.RasterDataset(rmap + "@" + tgis.get_current_mapset()) for rmap in r_maps], tgis.SpaceTimeRasterDataset(strds + "@" + tgis.get_current_mapset())    )
         tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
-        # print("registering maps", r_maps)
-        # register_map_object_list("raster",
-        # [tgis.RasterDataset(rmap) for rmap in r_maps], output_stds=tgis_strds, delete_empty=True)
 
         register_maps_in_space_time_dataset(
             "raster",  # type,
