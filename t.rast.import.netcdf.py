@@ -122,7 +122,7 @@
 #% required: no
 #% multiple: no
 #% label: Resampling method when data is reprojected
-#% options: nearest, bilinear, bilinear_f, bicubic, bicubic_f, cubicspline, lanczos, lanczos_f, min, Q1, average, med, Q3, max, mode
+#% options: nearest,bilinear,bilinear_f,bicubic,bicubic_f,cubicspline,lanczos,lanczos_f,min,Q1,average,med,Q3,max,mode
 #% guisection: Settings
 #%end
 
