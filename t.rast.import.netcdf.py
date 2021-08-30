@@ -37,7 +37,7 @@
 #%flag
 #% key: r
 #% description: Import only within current region
-#% guisection: Settings
+#% guisection: Filter
 #%end
 
 #%flag
@@ -85,6 +85,38 @@
 #%end
 
 #%option
+#% key: end_time
+#% label: Latest timestamp of temporal extent to include in the output
+#% description: Timestamp of format "YYYY-MM-DD HH:MM:SS"
+#% type: string
+#% required: no
+#% multiple: no
+#% guisection: Filter
+#%end
+
+#%option
+#% key: start_time
+#% label: Earliest timestamp of temporal extent to include in the output
+#% description: Timestamp of format "YYYY-MM-DD HH:MM:SS"
+#% type: string
+#% required: no
+#% multiple: no
+#% guisection: Filter
+#%end
+
+#%option
+#% key: temporal_relations
+#% label: Allowed temporal relation for temporal filtering
+#% description: Allowed temporal relation between time dimension in the netCDF file and temporal window defined by start_time and end_time
+#% type: string
+#% required: no
+#% multiple: yes
+#% options: equal,during,contains,overlaps,overlapped,starts,started,finishes,finished
+#% answer: equal,during,contains,overlaps,overlapped,starts,started,finishes,finished
+#% guisection: Filter
+#%end
+
+#%option
 #% key: resample
 #% type: string
 #% required: no
@@ -102,6 +134,12 @@
 #% label: Print metadata and exit
 #% options: extended, grass
 #% guisection: Print
+#%end
+
+#%option G_OPT_M_COLR
+#% description: Color table to assign to imported datasets
+#% answer: viridis
+#% guisection: Settings
 #%end
 
 #%option
@@ -138,16 +176,23 @@
 #% required: print,output
 #%end
 
+#%option
+#% key: nodata
+#% type: string
+#% required: no
+#% multiple: yes
+#% key_desc: Source nodata
+#% description: Comma separated list of values representing nodata in the input dataset
+#%end
+
 # Todo:
-# Allow temporal filtering
-# Allow usage of additional nodata values
-# - Allow user to choose what metadata to print
-#   (e.g. no data values, CF-tags, scaling, cloud coverage)
-#   maybe add some of it in the map name, so STRDS could be filtered based on that
+# Allow filtering based on metadata
+# Support more VRT options (resolution, extent)
 # Allow to print subdataset information as bandref json (useful defining custom bandreferences)
 # - Make use of more metadata (units, scaling)
 
 from copy import deepcopy
+from datetime import datetime
 from io import StringIO
 from itertools import chain
 from multiprocessing import Pool
@@ -171,6 +216,7 @@ from grass.pygrass.modules import Module, MultiModule, ParallelModuleQueue
 
 # from grass.temporal. import update_from_registered_maps
 from grass.temporal.register import register_maps_in_space_time_dataset
+from grass.temporal.temporal_extent import TemporalExtent
 from grass.temporal.datetime_math import datetime_to_grass_datetime_string
 
 # Datasets may or may not contain subdatasets
@@ -414,6 +460,51 @@ def get_import_type(url, projection_match, resample, flags_dict):
     return import_type, resample
 
 
+def setup_temporal_filter(options_dict):
+    """Gernerate temporal filter from input"""
+    time_formats = {
+        10: "%Y-%m-%d",
+        19: "%Y-%m-%d %H:%M:%S",
+    }
+    kwargs = {}
+    relations = options_dict["temporal_relations"].split(",")
+    for time_ref in ["start_time", "end_time"]:
+        if options_dict[time_ref]:
+            if len(options_dict[time_ref]) not in time_formats:
+                gscript.fatal(_("Unsupported datetime format in {}.".format(time_ref)))
+            try:
+                kwargs[time_ref] = datetime.strptime(
+                    options_dict[time_ref], time_formats[len(options_dict[time_ref])]
+                )
+            except ValueError:
+                gscript.fatal(_("Can not parse input in {}.".format(time_ref)))
+        else:
+            kwargs[time_ref] = None
+    return TemporalExtent(**kwargs), relations
+
+
+def apply_temporal_filter(ref_window, relations, start, end):
+    """Apply temporal filter to time dimension"""
+    if ref_window.start_time is None and ref_window.end_time is None:
+        return True
+    return (
+        ref_window.temporal_relation(TemporalExtent(start_time=start, end_time=end))
+        in relations
+    )
+
+
+def get_end_time(start_time_dimensions):
+    """Compute end time from start time"""
+    end_time_dimensions = None
+    if len(start_time_dimensions) > 1:
+        time_deltas = np.diff(start_time_dimensions)
+        time_deltas = np.append(time_deltas, np.mean(time_deltas))
+        end_time_dimensions = start_time_dimensions + time_deltas
+    else:
+        end_time_dimensions = start_time_dimensions
+    return end_time_dimensions
+
+
 # import or link data
 def read_data(
     input_url,
@@ -422,15 +513,19 @@ def read_data(
     options_dict,
     import_type,
     flags_dict,
-    time_dimensions,
+    start_time_dimensions,
+    end_time_dimensions,
+    requested_time_dimensions,
     gisenv,
     projection_match,
     resamp,
+    nodata,
     strds_name,
 ):
     """Import or link data and metadata"""
     maps = []
     queue = []
+
     imp_flags = "o" if flags_dict["o"] else ""
     # r.external [-feahvtr]
     # r.import [-enl]
@@ -442,7 +537,7 @@ def read_data(
         quiet=True,
         input=input_url
         if not is_subdataset
-        else create_vrt(input_url, gisenv, resamp, projection_match),
+        else create_vrt(input_url, gisenv, resamp, nodata, projection_match),
         run_=False,
         finish_=False,
         flags=imp_flags,
@@ -468,7 +563,7 @@ def read_data(
     time_mod = Module("r.timestamp", quiet=True, run_=False, finish_=False)
     # Setup timestamp module
     color_mod = Module(
-        "r.colors", quiet=True, color="viridis", run_=False, finish_=False
+        "r.colors", quiet=True, color=options_dict["color"], run_=False, finish_=False
     )
     # Parallel module
     mapname_list = []
@@ -476,31 +571,28 @@ def read_data(
     mapname_list.append(legalize_name_string(infile[0]))
     if is_subdataset:
         mapname_list.append(legalize_name_string(infile[1]))
-    end_time_dimensions = None
-    if len(time_dimensions) > 1:
-        time_deltas = np.diff(time_dimensions)
-        time_deltas = np.append(time_deltas, np.mean(time_deltas))
-        end_time_dimensions = time_dimensions + time_deltas
 
-    raster_bands = range(rastercount) if rastercount > 0 else [0]
-    for i in raster_bands:
-        mapname = "_".join(mapname_list + [time_dimensions[i].strftime("%Y_%m_%d")])
+    for i, band in enumerate(requested_time_dimensions):
+        mapname = "_".join(
+            mapname_list + [start_time_dimensions[i].strftime("%Y_%m_%d")]
+        )
         maps.append(
             "{map}@{mapset}|{start_time}|{end_time}|{bandref}".format(
                 map=mapname,
                 mapset=gisenv["MAPSET"],
-                start_time=time_dimensions[i].strftime("%Y-%m-%d %H:%M:%S"),
-                end_time="" if end_time_dimensions is None else end_time_dimensions[i],
+                start_time=start_time_dimensions[i].strftime("%Y-%m-%d %H:%M:%S"),
+                end_time=end_time_dimensions[i].strftime("%Y-%m-%d %H:%M:%S"),
                 bandref="" if "bandref" not in metadata else metadata["bandref"],
             )
         )
         new_import = deepcopy(import_mod)
-        new_import(band=i + 1, output=mapname)
+        new_import(band=band + 1, output=mapname)
         new_meta = deepcopy(meta_mod)
         new_meta(map=mapname)
         new_time = deepcopy(time_mod)
         new_time(
-            map=mapname, date=datetime_to_grass_datetime_string(time_dimensions[i])
+            map=mapname,
+            date=datetime_to_grass_datetime_string(start_time_dimensions[i]),
         )
         new_color = deepcopy(color_mod)
         new_color(map=mapname)
@@ -510,11 +602,12 @@ def read_data(
     return strds_name, maps, queue
 
 
-def create_vrt(subdataset_url, gisenv, resample, equal_proj):
+def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
     """Create a GDAL VRT for import"""
     vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
         gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
     )
+    # current_region = gscript.region()
     if not vrt_dir.is_dir():
         vrt_dir.mkdir()
     vrt_name = str(
@@ -522,20 +615,43 @@ def create_vrt(subdataset_url, gisenv, resample, equal_proj):
             "netcdf_{}.vrt".format(legalize_name_string(Path(subdataset_url).name))
         )
     )
+    kwargs = {"format": "VRT"}
     if equal_proj:
-        vrt = gdal.BuildVRT(vrt_name, subdataset_url)
+        if nodata is not None:
+            kwargs["noData"] = nodata
+        vrt = gdal.Translate(
+            vrt_name,
+            subdataset_url,
+            options=gdal.TranslateOptions(
+                **kwargs
+                # format="VRT",
+                # stats=True,
+                # outputType=gdal.GDT_Int16,
+                # outputBounds=,
+                # xRes=resolution,
+                # yRes=resolution,
+                # noData=nodata,
+            ),
+        )
     else:
+        kwargs["dstSRS"] = gisenv["LOCATION_PROJECTION"]
+        kwargs["resampleAlg"] = resample
+
+        if nodata is not None:
+            kwargs["srcNodata"] = nodata
         vrt = gdal.Warp(
             vrt_name,
             subdataset_url,
             options=gdal.WarpOptions(
-                format="VRT",
+                **kwargs
+                # format="VRT",
                 # outputType=gdal.GDT_Int16,
-                # xRes=10,
-                # yRes=10,
-                dstSRS=gisenv["LOCATION_PROJECTION"],
-                # srcNodata=1,
-                resampleAlg=resample,
+                # outputBounds
+                # xRes=resolution,
+                # yRes=resolution,
+                # dstSRS=gisenv["LOCATION_PROJECTION"],
+                # srcNodata=nodata,
+                # resampleAlg=resample,
             ),
         )
     vrt = None
@@ -549,6 +665,16 @@ def main():
 
     input = options["input"].split(",")
     sep = gscript.utils.separator(options["separator"])
+
+    valid_window, valid_relations = setup_temporal_filter(options)
+
+    if options["nodata"]:
+        try:
+            nodata = " ".join(map(str, map(int, options["nodata"].split(","))))
+        except Exception:
+            gscript.fatal(_("Invalid input for nodata"))
+    else:
+        nodata = None
 
     if len(input) == 1:
         if input[0] == "-":
@@ -647,6 +773,8 @@ def main():
             # Check raster layers
             sds = [ncdf, "", "", 0]
 
+        # Extract metadata
+
         # Collect relevant inputs in a dictionary
         inputs[in_url] = {}
         inputs[in_url]["sds"] = [
@@ -664,6 +792,33 @@ def main():
 
         # Close open GDAL datasets
         sds = None
+
+        # Apply temporal filter
+        for sd in inputs[in_url]["sds"]:
+            end_times = get_end_time(sd["time_dimensions"])
+            requested_time_dimensions = np.array(
+                [
+                    apply_temporal_filter(
+                        valid_window, valid_relations, start, end_times[idx]
+                    )
+                    for idx, start in enumerate(sd["time_dimensions"])
+                ]
+            )
+            if not requested_time_dimensions.any():
+                gscript.warning(
+                    _(
+                        "Nothing to import from subdataset {s} in {f}".format(
+                            s=sd["id"], f=sd["url"]
+                        )
+                    )
+                )
+                inputs[in_url]["sds"].remove(sd)
+            else:
+                sd["start_time_dimensions"] = sd["time_dimensions"][
+                    requested_time_dimensions
+                ]
+                sd["end_time_dimensions"] = end_times[requested_time_dimensions]
+                sd["requested_time_dimensions"] = np.where(requested_time_dimensions)[0]
 
     if options["print"] in ["grass", "extended"]:
         # ["|".join([[s["url"], s["id"]] + s["extended_metadata"].values])
@@ -754,10 +909,13 @@ def main():
                     options,
                     import_module,
                     flags,
-                    sd["time_dimensions"],
+                    sd["start_time_dimensions"],
+                    sd["end_time_dimensions"],
+                    sd["requested_time_dimensions"],
                     grass_env,
                     sds["proj_match"],
                     resample,
+                    nodata,
                     strds_name,
                 )
             )
