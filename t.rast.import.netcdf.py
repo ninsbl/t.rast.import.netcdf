@@ -139,6 +139,7 @@
 #%end
 
 # Todo:
+# Allow temporal filtering
 # - Allow user to choose what metadata to print
 #   (e.g. no data values, CF-tags, scaling, cloud coverage)
 #   maybe add some of it in the map name, so STRDS could be filtered based on that
@@ -471,10 +472,19 @@ def read_data(
     mapname_list.append(legalize_name_string(infile[0]))
     if is_subdataset:
         mapname_list.append(legalize_name_string(infile[1]))
+    end_time_dimensions = None
+    if len(time_dimensions) > 1:
+        time_deltas = np.diff(time_dimensions)
+        time_deltas = np.append(time_deltas, np.mean(time_deltas))
+        end_time_dimensions = time_dimensions + time_deltas
+        print(end_time_dimensions)
+
     raster_bands = range(rastercount) if rastercount > 0 else [0]
     for i in raster_bands:
         mapname = "_".join(mapname_list + [time_dimensions[i].strftime("%Y_%m_%d")])
-        maps.append(mapname + "@" + gisenv["MAPSET"])
+        maps.append("{map}@{mapset}|{start_time}|{end_time}|{bandref}".format(map=mapname, mapset=gisenv["MAPSET"], start_time=time_dimensions[i].strftime("%Y-%m-%d %H:%M:%S"),
+        end_time="" if end_time_dimensions is None else end_time_dimensions[i],
+        bandref="" if "bandref" not in metadata else metadata["bandref"]))
         new_import = deepcopy(import_mod)
         new_import(band=i + 1, output=mapname)
         new_meta = deepcopy(meta_mod)
@@ -763,14 +773,20 @@ def main():
         )
     queue.wait()
 
+    from io import StringIO
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
         tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
 
+        #print("before seek")
+        #print(StringIO("\n".join(r_maps)).readlines())
+        #print("after seek")
+        #print(StringIO("\n".join(r_maps)).seek(0).readlines())
+
         register_maps_in_space_time_dataset(
             "raster",  # type,
             strds_name + "@" + grass_env["MAPSET"],
-            maps=",".join(r_maps),
+            file=StringIO("\n".join(r_maps)),  # .seek(0),
             update_cmd_list=False,
         )
 
