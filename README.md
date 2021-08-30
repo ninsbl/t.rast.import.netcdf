@@ -1,5 +1,4 @@
-# t.rast.import.netcdf: A GRASS GIS module to import spatio-temporal data from
-netCDF into a GRASS GIS STRDS
+# t.rast.import.netcdf: A GRASS GIS module to import spatio-temporal data from netCDF into a GRASS GIS STRDS
 
 [![GRASS GIS module](https://img.shields.io/badge/GRASS%20GIS-module-%23009000)](https://grass.osgeo.org/)
 [![CI](https://github.com/ninsbl/t.rast.import.netcdf/workflows/CI/badge.svg)](https://github.com/ninsbl/t.rast.import.netcdf/actions?query=workflow%3A%22CI%22)
@@ -13,5 +12,4 @@ Manual of the module is available here:
 https://ninsbl.github.io/t.rast.import.netcdf/
 
 ## How to contribute to this repository
-
 Fork the project and submit a pull request or open an issue.
