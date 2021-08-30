@@ -59,22 +59,20 @@ echo "B1=S2_1
 B2=S2_2" > bandref.conf
 
 # Import data (link NetCDF files without downloading them)
-t.rast.import.netcdf -l input=nc.txt output=S2A bandref=bandref.conf memory=2048 nprocs=2\
+t.rast.import.netcdf -l input=nc.txt output=S2A bandref=bandref.conf memory=2048 \
+nprocs=2 nodata="-1"
 </pre></div>
 
 <h3>Import Norwegian Climate data</h3>
 <div class="code"><pre>
-# Choose dataset to import (see also m.crawl.thredds module)
-echo "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc
-https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T32VNL_20210228T201033_DTERRENGDATA.nc" > nc.txt
-
 # Create a band reference configuraton file
 echo "tg=temperature_avg
 tn=temperature_min" > bandref.conf
 
-# Import data
+# Import data within a selected time window
 t.rast.import.netcdf output=SeNorge bandref=bandref.conf memory=2048 nprocs=2 \
-input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_1957/Archive/seNorge2018_2021.nc \
+start_time="2020-08-01" end_time="2021-08-01" \
+input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2018/Archive/seNorge2018_2020.nc
 </pre></div>
 
 <h3>Append to STRDS from previous imports</h3>
@@ -85,9 +83,10 @@ input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_1957/Archive/seN
 echo "tg=temperature_avg
 tn=temperature_min" > bandref.conf
 
-# Import data
+# Import data within a selected time window
 t.rast.import.netcdf output=SeNorge bandref=bandref.conf memory=2048 nprocs=2 -a \
-input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2020/Archive/seNorge2018_2021.nc \
+start_time="2020-08-01" end_time="2021-08-01" \
+input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2018/Archive/seNorge2018_2021.nc
 </pre></div>
 
 <h2>TODO</h2>
@@ -95,7 +94,7 @@ input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2020/Archive/seN
 <li>Capture and store extended metadata in a way that allows for filtering
 of relevant maps.</li>
 <li>Improve printing of metadata and file structure</li>
-<li>Improve parallel import (does not work for single layer subdatasets)</li>
+<li>Support more options of Virtual Raster files (resolution, extent)</li>
 </ol>
 
 
@@ -103,7 +102,7 @@ of relevant maps.</li>
 <em>
 <a href="t.rast.import.html">t.rast.import</a>
 <a href="m.crawl.thredds.html">m.crawl.thredds</a>,
-<a href="r3.out.netcdf.html">m.crawl.thredds</a>,
+<a href="r3.out.netcdf.html">r3.out.netcdf</a>,
 <a href="g.bands.html">g.bands</a>
 <a href="r.support.html">r.support</a>
 </em>
