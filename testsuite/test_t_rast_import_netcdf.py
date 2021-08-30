@@ -37,7 +37,7 @@ class TestNetCDFImport(TestCase):
     # STRDS to be used as output for sentinel data test
     output_sentinel = "S2"
     # NetCDF URL to be used as input for climate data test
-    input_climate = "https://thredds.met.no/thredds/fileServer/senorge/seNorge_1957/Archive/seNorge2018_2021.nc"
+    input_climate = "https://thredds.met.no/thredds/fileServer/senorge/seNorge_2018/Archive/seNorge2018_2021.nc"
     # Input file name
     input_file = "url_list.txt"
     # STRDS to be used as output for climate data test
@@ -114,9 +114,8 @@ class TestNetCDFImport(TestCase):
         # Adjust to STRDS
         # self.assertRasterExists(self.output, msg="Output was not created")
 
-    """
     def test_sentinel_output_appended(self):
-        ""Check that the output is created""
+        """Check that the output is created"""
         # run the import module
         self.assertModule(
             "t.rast.import.netcdf",
@@ -138,7 +137,7 @@ class TestNetCDFImport(TestCase):
         )
 
     def test_sentinel_input_comma_separated(self):
-        ""Check that the output is created""
+        """Check that the output is created"""
         self.assertModule(
             "t.rast.import.netcdf",
             flags="lo",
@@ -150,7 +149,7 @@ class TestNetCDFImport(TestCase):
         )
 
     def test_sentinel_input_file(self):
-        ""Check that the output is created""
+        """Check that the output is created"""
         with open(self.input_file, "w") as f:
             f.write("\n".join(self.input_sentinel))
         self.assertModule(
@@ -164,7 +163,7 @@ class TestNetCDFImport(TestCase):
         )
 
     def test_climate_output_created(self):
-        ""Check that the output is created""
+        """Check that the output is created"""
         self.assertModule(
             "t.rast.import.netcdf",
             flags="lo",
@@ -174,7 +173,6 @@ class TestNetCDFImport(TestCase):
             memory=2048,
             nprocs=2,
         )
-    """
 
     def test_missing_parameter(self):
         """Check that the module fails when parameters are missing
