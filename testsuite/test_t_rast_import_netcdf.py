@@ -109,6 +109,7 @@ class TestNetCDFImport(TestCase):
             output=self.output_sentinel,
             memory=2048,
             nprocs=2,
+            nodata=-1
         )
         # check to see if output is in mapset
         # Adjust to STRDS
@@ -170,6 +171,8 @@ class TestNetCDFImport(TestCase):
             input=self.input_climate,
             output=self.output_climate,
             bandref="bandref_sn.conf",
+            start_time="2021-01-01",
+            end_time="2021-01-03 12:12:12",
             memory=2048,
             nprocs=2,
         )
