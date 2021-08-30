@@ -203,6 +203,7 @@ resample_dict = {
     },
 }
 
+grass_version = list(map(int, gscript.version()["version"].split(".")[0:2]))
 
 def legalize_name_string(string):
     """Replace conflicting characters with _"""
@@ -230,7 +231,7 @@ def parse_badref_conf(conf_file):
     if conf_file is None or conf_file == "":
         return None
 
-    if int(gscript.version()["version"].split(".")[0]) < 8:
+    if grass_version[0] < 8:
         gscript.warning(
             _(
                 "The band reference concept requires GRASS GIS version 8.0 or later.\n"
@@ -781,6 +782,12 @@ def main():
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
         tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
+        if grass_version >= [8, 1]:
+            map_file = StringIO("\n".join(r_maps))
+        else:
+            map_file = gscript.tempfile()
+            with open(map_file, "w") as mf:
+                mf.write("\n".join(r_maps))
         register_maps_in_space_time_dataset(
             "raster",
             strds_name + "@" + grass_env["MAPSET"],
