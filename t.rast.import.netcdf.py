@@ -205,6 +205,7 @@ resample_dict = {
 
 grass_version = list(map(int, gscript.version()["version"].split(".")[0:2]))
 
+
 def legalize_name_string(string):
     """Replace conflicting characters with _"""
     legal_string = re.sub(r"[^\w\d-]+|[^\x00-\x7F]+|[ -/\\]+", "_", string)
