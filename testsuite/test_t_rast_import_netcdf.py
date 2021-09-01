@@ -109,7 +109,7 @@ class TestNetCDFImport(TestCase):
             output=self.output_sentinel,
             memory=2048,
             nprocs=2,
-            nodata=-1
+            nodata=-1,
         )
         # check to see if output is in mapset
         # Adjust to STRDS
