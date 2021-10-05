@@ -527,6 +527,9 @@ def read_data(
     queue = []
 
     imp_flags = "o" if flags_dict["o"] else ""
+    # Requires GRASS GIS >= 8.0
+    if import_type == "r.external":
+        imp_flags += "m"
     # r.external [-feahvtr]
     # r.import [-enl]
     # r.in.gdal [-eflakcrp]
