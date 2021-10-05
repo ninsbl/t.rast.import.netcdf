@@ -733,7 +733,7 @@ def main():
 
     for in_url in input:
         # Check if file exists and readable
-        gscript.verbose(_("Processing {}".format(in_url))
+        gscript.verbose(_("Processing {}".format(in_url)))
         try:
             ncdf = gdal.Open(in_url)
         except FileNotFoundError:
