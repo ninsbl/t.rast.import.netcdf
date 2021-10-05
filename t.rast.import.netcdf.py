@@ -740,7 +740,8 @@ def main():
 
         # Get CF version
         cf_version = ncdf_metadata.get("NC_GLOBAL#Conventions")
-        if not cf_version.upper().startswith("CF"):
+
+        if cf_version is None or not cf_version.upper().startswith("CF"):
             gscript.warning(
                 _(
                     "Input netCDF file does not adhere to CF-standard. Import may fail or be incorrect."
