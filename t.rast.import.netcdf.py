@@ -730,6 +730,7 @@ def main():
 
     for in_url in input:
         # Check if file exists and readable
+        gscript.verbose(_("Processing {}".format(in_url))
         try:
             ncdf = gdal.Open(in_url)
         except FileNotFoundError:
@@ -760,6 +761,7 @@ def main():
             for sds in ncdf.GetSubDatasets()
             if len(sds[1].split(" ")[0].split("x")) == 3
         ]
+        print("SDS 1", sds)
 
         # Filter based on bandref if provided
         if bandref is not None:
@@ -770,12 +772,13 @@ def main():
             sds = [[gdal.Open(s[1])] + s for s in sds]
         elif len(sds) == 0 and ncdf.RasterCount == 0:
             gscript.warning(_("No data to import from file {}").format(in_url))
+            continue
         else:
             # Check raster layers
             sds = [ncdf, "", "", 0]
 
         # Extract metadata
-
+        print("SDS 2", sds)
         # Collect relevant inputs in a dictionary
         inputs[in_url] = {}
         inputs[in_url]["sds"] = [
