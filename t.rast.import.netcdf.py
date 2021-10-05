@@ -734,8 +734,9 @@ def main():
     for in_url in input:
         # Check if file exists and readable
         gscript.verbose(_("Processing {}".format(in_url)))
+        nc_driver = gdal.GetDriverByName("netCDF")
         try:
-            ncdf = gdal.Open(in_url)
+            ncdf = nc_driver.Open(in_url)
         except FileNotFoundError:
             gscript.fatal(_("Could not open <{}>".format(in_url)))
 
