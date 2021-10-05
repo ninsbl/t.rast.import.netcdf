@@ -854,10 +854,11 @@ def main():
         for i in inputs:
             inputs[i]["proj_match"] = True
     else:
+        print([i for i in inputs])
         with Pool(processes=int(options["nprocs"])) as pool:
             # Check (only first subdataset) if projections match
             projection_match = pool.map(
-                check_projection_match, [inputs[i]["sds"][0]["url"] for i in inputs]
+                check_projection_match, [i["sds"][0]["url"] for i in inputs]
             )
 
         for idx, url in enumerate(inputs):
