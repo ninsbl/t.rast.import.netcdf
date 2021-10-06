@@ -968,7 +968,7 @@ def main():
         register_maps_in_space_time_dataset(
             "raster",
             strds_name + "@" + grass_env["MAPSET"],
-            file=StringIO("\n".join(r_maps)),
+            file=map_file,
             update_cmd_list=False,
         )
 
