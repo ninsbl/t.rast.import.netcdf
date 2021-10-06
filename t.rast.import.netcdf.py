@@ -263,7 +263,7 @@ def get_time_dimensions(meta):
     if "NETCDF_DIM_time_VALUES" not in meta:
         return None
     time_values = np.fromstring(
-        meta["NETCDF_DIM_time_VALUES"].strip("{").strip("}"), sep=",", dtype=np.float
+        meta["NETCDF_DIM_time_VALUES"].strip("{").strip("}"), sep=",", dtype=np.float64
     )
     time_dates = cf_units.num2date(
         time_values, meta["time#units"], meta["time#calendar"]
@@ -774,7 +774,6 @@ def main():
             for sds in ncdf.GetSubDatasets()
             if len(sds[1].split(" ")[0].split("x")) == 3
         ]
-        print("SDS 1", sds)
 
         # Filter based on bandref if provided
         if bandref is not None:
@@ -791,7 +790,6 @@ def main():
             sds = [ncdf, "", "", 0]
 
         # Extract metadata
-        print("SDS 2", sds)
         # Collect relevant inputs in a dictionary
         inputs[in_url] = {}
         inputs[in_url]["sds"] = [
@@ -870,7 +868,6 @@ def main():
         for i in inputs:
             inputs[i]["proj_match"] = True
     else:
-        print([i for i in inputs])
         with Pool(processes=int(options["nprocs"])) as pool:
             # Check (only first subdataset) if projections match
             projection_match = pool.map(
