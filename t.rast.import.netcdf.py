@@ -666,6 +666,9 @@ def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
 def main():
     """run the main workflow"""
 
+    if 'netCDF' not in  [gdal.GetDriver(d).ShortName for d in range(gdal.GetDriverCount())]:
+            gscript.fatal(_("netCDF driver missing in GDAL. Please install netcdf binaries."))
+
     input = options["input"].split(",")
     sep = gscript.utils.separator(options["separator"])
 
@@ -695,6 +698,7 @@ def main():
     ]
 
     for in_url in input:
+        # MAybe other suffixes are valid too?
         if not in_url.endswith(".nc"):
             gscript.fatal(_("<{}> does not seem to be a NetCDF file".format(in_url)))
 
@@ -734,12 +738,10 @@ def main():
     for in_url in input:
         # Check if file exists and readable
         gscript.verbose(_("Processing {}".format(in_url)))
-        gdal.GetDriverByName("HDF5").Deregister()
-        gdal.GetDriverByName("HDF5Image").Deregister()
         try:
             ncdf = gdal.Open(in_url)
         except FileNotFoundError:
-            gscript.fatal(_("Could not open <{}>".format(in_url)))
+            gscript.warning(_("Could not open <{}>.\nSkipping...".format(in_url)))
 
         # Get global metadata
         ncdf_metadata = ncdf.GetMetadata()
