@@ -666,8 +666,14 @@ def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
 def main():
     """run the main workflow"""
 
-    if 'netCDF' not in  [gdal.GetDriver(d).ShortName for d in range(gdal.GetDriverCount())]:
+    # Check if NetCDF driver is available
+    if not gdal.GetDriverByName("netCDF"):
             gscript.fatal(_("netCDF driver missing in GDAL. Please install netcdf binaries."))
+
+    # Unregister potentially conflicting driver
+    for driver in ['HDF5', 'HDF5Image']:
+        if gdal.GetDriverByName(driver):
+            gdal.GetDriverByName(driver).Deregister()
 
     input = options["input"].split(",")
     sep = gscript.utils.separator(options["separator"])
@@ -693,7 +699,7 @@ def main():
                 gscript.fatal(_("Unable to read text from <{}>.".format(input[0])))
 
     input = [
-        "NETCDF:/vsicurl/" + in_url if in_url.startswith("http") else "NETCDF:" + in_url
+        "/vsicurl/" + in_url if in_url.startswith("http") else in_url
         for in_url in input
     ]
 
