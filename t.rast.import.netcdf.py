@@ -693,7 +693,7 @@ def main():
                 gscript.fatal(_("Unable to read text from <{}>.".format(input[0])))
 
     input = [
-        f"NETCDF:/vsicurl/{in_url}" if in_url.startswith("http") else f"NETCDF:/{in_url}"
+        "NETCDF:/vsicurl/" + in_url if in_url.startswith("http") else "NETCDF:" + in_url
         for in_url in input
     ]
 
