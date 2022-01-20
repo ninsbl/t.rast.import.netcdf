@@ -863,7 +863,9 @@ def main():
                         ]
                         + list(map(str, sd[print_type].values()))
                     )
-                    for sd in chain.from_iterable([i["sds"] for i in inputs_dict.values()])
+                    for sd in chain.from_iterable(
+                        [i["sds"] for i in inputs_dict.values()]
+                    )
                 ]
             )
         )
@@ -877,7 +879,8 @@ def main():
         with Pool(processes=int(options["nprocs"])) as pool:
             # Check (only first subdataset) if projections match
             projection_match = pool.map(
-                check_projection_match, [inputs_dict[i]["sds"][0]["url"] for i in inputs_dict]
+                check_projection_match,
+                [inputs_dict[i]["sds"][0]["url"] for i in inputs_dict],
             )
 
         for idx, url in enumerate(inputs_dict):
