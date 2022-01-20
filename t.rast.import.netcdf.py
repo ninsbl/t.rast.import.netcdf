@@ -69,12 +69,12 @@
 #%end
 
 #%option G_OPT_F_INPUT
-#% key: bandref
+#% key: semantic_labels
 #% type: string
 #% required: no
 #% multiple: no
-#% key_desc: Input file with bandreference configuration ("-" = stdin)
-#% description: File with mapping of variables or subdatasets to band references
+#% key_desc: Input file with configuration for semantic labels ("-" = stdin)
+#% description: File with mapping of variables or subdatasets to semantic labels
 #% guisection: Settings
 #%end
 
@@ -188,7 +188,7 @@
 # Todo:
 # Allow filtering based on metadata
 # Support more VRT options (resolution, extent)
-# Allow to print subdataset information as bandref json (useful defining custom bandreferences)
+# Allow to print subdataset information as semantic label json (useful defining custom semantic labels)
 # - Make use of more metadata (units, scaling)
 
 from copy import deepcopy
@@ -271,8 +271,8 @@ def get_time_dimensions(meta):
     return time_dates
 
 
-def parse_badref_conf(conf_file):
-    """Read user provided mapping of subdatasets / variables to band references
+def parse_semantic_label_conf(conf_file):
+    """Read user provided mapping of subdatasets / variables to semantic labels
     Return a dict with mapping, bands that are not mapped in this file are skipped
     from import"""
     if conf_file is None or conf_file == "":
@@ -281,16 +281,16 @@ def parse_badref_conf(conf_file):
     if grass_version[0] < 8:
         gscript.warning(
             _(
-                "The band reference concept requires GRASS GIS version 8.0 or later.\n"
-                "Ignoring the band reference configuration file <{conf_file}>".format(
+                "The semantic labels concept requires GRASS GIS version 8.0 or later.\n"
+                "Ignoring the semantic label configuration file <{conf_file}>".format(
                     conf_file=conf_file
                 )
             )
         )
         return None
 
-    bandref = {}
-    if not os.access(options["bandref"], os.R_OK):
+    semantic_label = {}
+    if not os.access(options["semantic_labels"], os.R_OK):
         gscript.fatal(
             _(
                 "Cannot read configuration file <{conf_file}>".format(
@@ -299,7 +299,7 @@ def parse_badref_conf(conf_file):
             )
         )
     # Lazy import GRASS GIS 8 function if needed
-    from grass.lib.raster import Rast_legal_bandref
+    from grass.lib.raster import Rast_legal_semantic_label
 
     with open(conf_file, "r") as c_file:
         configuration = c_file.read()
@@ -308,9 +308,9 @@ def parse_badref_conf(conf_file):
                 continue
             if len(line.split("=")) == 2:
                 line = line.split("=")
-                # Check if assigned band reference has legal a name
-                if Rast_legal_bandref(line[1]) == 1:
-                    bandref[line[0]] = line[1]
+                # Check if assigned semantic label has legal a name
+                if Rast_legal_semantic_label(line[1]) == 1:
+                    semantic_label[line[0]] = line[1]
                 else:
                     gscript.fatal(
                         _(
@@ -323,16 +323,16 @@ def parse_badref_conf(conf_file):
             else:
                 gscript.fatal(
                     _(
-                        "Invalid format of band reference configuration in file <{}>".format(
+                        "Invalid format of semantic label configuration in file <{}>".format(
                             conf_file
                         )
                     )
                 )
 
-    return bandref
+    return semantic_label
 
 
-def get_metadata(netcdf_metadata, subdataset="", bandref=None):
+def get_metadata(netcdf_metadata, subdataset="", semantic_label=None):
     """Transform NetCDF metadata to GRASS metadata"""
     # title , history , institution , source , comment and references
     # netcdf_metadata = netcdf.GetMetadata()
@@ -389,8 +389,8 @@ def get_metadata(netcdf_metadata, subdataset="", bandref=None):
             ),
         )
     )
-    if bandref is not None:
-        meta["bandref"] = bandref[subdataset]
+    if semantic_label is not None:
+        meta["semantic_label"] = semantic_label[subdataset]
 
     return meta
 
@@ -580,12 +580,14 @@ def read_data(
             mapname_list + [start_time_dimensions[i].strftime("%Y_%m_%d")]
         )
         maps.append(
-            "{map}@{mapset}|{start_time}|{end_time}|{bandref}".format(
+            "{map}@{mapset}|{start_time}|{end_time}|{semantic_label}".format(
                 map=mapname,
                 mapset=gisenv["MAPSET"],
                 start_time=start_time_dimensions[i].strftime("%Y-%m-%d %H:%M:%S"),
                 end_time=end_time_dimensions[i].strftime("%Y-%m-%d %H:%M:%S"),
-                bandref="" if "bandref" not in metadata else metadata["bandref"],
+                semantic_label=""
+                if "semantic_label" not in metadata
+                else metadata["semantic_label"],
             )
         )
         new_import = deepcopy(import_mod)
@@ -668,14 +670,16 @@ def main():
 
     # Check if NetCDF driver is available
     if not gdal.GetDriverByName("netCDF"):
-            gscript.fatal(_("netCDF driver missing in GDAL. Please install netcdf binaries."))
+        gscript.fatal(
+            _("netCDF driver missing in GDAL. Please install netcdf binaries.")
+        )
 
     # Unregister potentially conflicting driver
-    for driver in ['HDF5', 'HDF5Image']:
+    for driver in ["HDF5", "HDF5Image"]:
         if gdal.GetDriverByName(driver):
             gdal.GetDriverByName(driver).Deregister()
 
-    input = options["input"].split(",")
+    inputs = options["input"].split(",")
     sep = gscript.utils.separator(options["separator"])
 
     valid_window, valid_relations = setup_temporal_filter(options)
@@ -688,27 +692,27 @@ def main():
     else:
         nodata = None
 
-    if len(input) == 1:
-        if input[0] == "-":
-            input = sys.stdin.read().strip().split()
-        elif not input[0].endswith(".nc"):
+    if len(inputs) == 1:
+        if inputs[0] == "-":
+            inputs = sys.stdin.read().strip().split()
+        elif not inputs[0].endswith(".nc"):
             try:
-                with open(input[0], "r") as in_file:
-                    input = in_file.read().strip().split()
+                with open(inputs[0], "r") as in_file:
+                    inputs = in_file.read().strip().split()
             except IOError:
-                gscript.fatal(_("Unable to read text from <{}>.".format(input[0])))
+                gscript.fatal(_("Unable to read text from <{}>.".format(inputs[0])))
 
-    input = [
+    inputs = [
         "/vsicurl/" + in_url if in_url.startswith("http") else in_url
-        for in_url in input
+        for in_url in inputs
     ]
 
-    for in_url in input:
+    for in_url in inputs:
         # MAybe other suffixes are valid too?
         if not in_url.endswith(".nc"):
             gscript.fatal(_("<{}> does not seem to be a NetCDF file".format(in_url)))
 
-    bandref = parse_badref_conf(options["bandref"])
+    semantic_label = parse_semantic_label_conf(options["semantic_labels"])
 
     # Get GRASS GIS environment info
     grass_env = dict(gscript.gisenv())
@@ -739,9 +743,9 @@ def main():
     modified_strds = {}
     queued_modules = []
     queueing_input = []
-    inputs = {}
+    inputs_dict = {}
 
-    for in_url in input:
+    for in_url in inputs:
         # Check if file exists and readable
         gscript.verbose(_("Processing {}".format(in_url)))
         try:
@@ -775,9 +779,9 @@ def main():
             if len(sds[1].split(" ")[0].split("x")) == 3
         ]
 
-        # Filter based on bandref if provided
-        if bandref is not None:
-            sds = [s for s in sds if s[0] in bandref.keys()]
+        # Filter based on semantic_label if provided
+        if semantic_label is not None:
+            sds = [s for s in sds if s[0] in semantic_label.keys()]
 
         # Open subdatasets to get metadata
         if len(sds) > 0:  # and ncdf.RasterCount == 0:
@@ -791,12 +795,14 @@ def main():
 
         # Extract metadata
         # Collect relevant inputs in a dictionary
-        inputs[in_url] = {}
-        inputs[in_url]["sds"] = [
+        inputs_dict[in_url] = {}
+        inputs_dict[in_url]["sds"] = [
             {
                 "id": sd[1],
                 "url": sd[0].GetDescription(),
-                "grass_metadata": get_metadata(sd[0].GetMetadata(), sd[1], bandref),
+                "grass_metadata": get_metadata(
+                    sd[0].GetMetadata(), sd[1], semantic_label
+                ),
                 "extended_metadata": sd[0].GetMetadata(),
                 "time_dimensions": get_time_dimensions(sd[0].GetMetadata()),
                 "rastercount": sd[0].RasterCount,
@@ -809,7 +815,7 @@ def main():
         sds = None
 
         # Apply temporal filter
-        for sd in inputs[in_url]["sds"]:
+        for sd in inputs_dict[in_url]["sds"]:
             end_times = get_end_time(sd["time_dimensions"])
             requested_time_dimensions = np.array(
                 [
@@ -827,7 +833,7 @@ def main():
                         )
                     )
                 )
-                inputs[in_url]["sds"].remove(sd)
+                inputs_dict[in_url]["sds"].remove(sd)
             else:
                 sd["start_time_dimensions"] = sd["time_dimensions"][
                     requested_time_dimensions
@@ -842,7 +848,7 @@ def main():
         print(
             sep.join(
                 ["id", "url", "rastercount", "time_dimensions"]
-                + list(next(iter(inputs.values()))["sds"][0][print_type].keys())
+                + list(next(iter(inputs_dict.values()))["sds"][0][print_type].keys())
             )
         )
         print(
@@ -857,7 +863,7 @@ def main():
                         ]
                         + list(map(str, sd[print_type].values()))
                     )
-                    for sd in chain.from_iterable([i["sds"] for i in inputs.values()])
+                    for sd in chain.from_iterable([i["sds"] for i in inputs_dict.values()])
                 ]
             )
         )
@@ -865,26 +871,26 @@ def main():
 
     # Check if projections match
     if flags["o"]:
-        for i in inputs:
-            inputs[i]["proj_match"] = True
+        for i in inputs_dict:
+            inputs_dict[i]["proj_match"] = True
     else:
         with Pool(processes=int(options["nprocs"])) as pool:
             # Check (only first subdataset) if projections match
             projection_match = pool.map(
-                check_projection_match, [inputs[i]["sds"][0]["url"] for i in inputs]
+                check_projection_match, [inputs_dict[i]["sds"][0]["url"] for i in inputs_dict]
             )
 
-        for idx, url in enumerate(inputs):
-            inputs[url]["proj_match"] = projection_match[idx]
+        for idx, url in enumerate(inputs_dict):
+            inputs_dict[url]["proj_match"] = projection_match[idx]
 
-    for sds in inputs.values():
+    for sds in inputs_dict.values():
 
         # Here loop over subdatasets ()
         for sd in sds["sds"]:
 
             strds_name = (
                 "{}_{}".format(options["output"], sd["id"])
-                if sd["id"] and not bandref
+                if sd["id"] and not semantic_label
                 else options["output"]
             )
 
