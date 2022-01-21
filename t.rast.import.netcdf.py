@@ -528,7 +528,7 @@ def read_data(
 
     imp_flags = "o" if flags_dict["o"] else ""
     # Requires GRASS GIS >= 8.0
-    if import_type == "r.external":
+    if import_type == "r.external" and GRASS_VERSION[0] >= 8:
         imp_flags += "m"
     # r.external [-feahvtr]
     # r.import [-enl]
@@ -839,7 +839,9 @@ def main():
                     requested_time_dimensions
                 ]
                 s_d["end_time_dimensions"] = end_times[requested_time_dimensions]
-                s_d["requested_time_dimensions"] = np.where(requested_time_dimensions)[0]
+                s_d["requested_time_dimensions"] = np.where(requested_time_dimensions)[
+                    0
+                ]
 
     if options["print"] in ["grass", "extended"]:
         # ["|".join([[s["url"], s["id"]] + s["extended_metadata"].values])
