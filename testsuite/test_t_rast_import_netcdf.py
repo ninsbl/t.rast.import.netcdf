@@ -89,7 +89,7 @@ class TestNetCDFImport(TestCase):
         self.assertModule(
             "t.rast.import.netcdf",
             flags="lo",
-            input=self.input_sentinel[0],
+            input="https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc",  # self.input_sentinel[0],
             output=self.output_sentinel,
             semantic_label="bandref_2.conf",
             memory=2048,
@@ -105,7 +105,7 @@ class TestNetCDFImport(TestCase):
         self.assertModule(
             "t.rast.import.netcdf",
             flags="lo",
-            input=self.input_sentinel[0],
+            input="https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc",  # self.input_sentinel[0],
             output=self.output_sentinel,
             memory=2048,
             nprocs=2,
@@ -121,8 +121,8 @@ class TestNetCDFImport(TestCase):
         self.assertModule(
             "t.rast.import.netcdf",
             flags="lo",
-            input=self.input_sentinel[0],
-            output=self.output_sentinel,
+            input="https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc",  # self.input_sentinel[0],
+            output="test",  # self.output_sentinel,
             semantic_label="bandref_2.conf",
             memory=2048,
             nprocs=2,
