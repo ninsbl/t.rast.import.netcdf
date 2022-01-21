@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-############################################################################
-#
-# MODULE:       t.rast.import.netcdf
-# AUTHOR(S):    Stefan Blumentrath
-# PURPOSE:      Import netCDF files that adhere to the CF convention as a
-#               Space Time Raster Dataset (STRDS)
-# COPYRIGHT:    (C) 2021 by stefan.blumentrath, and the GRASS Development Team
-#
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-############################################################################
+
+"""
+ MODULE:       t.rast.import.netcdf
+ AUTHOR(S):    Stefan Blumentrath
+ PURPOSE:      Import netCDF files that adhere to the CF convention as a
+               Space Time Raster Dataset (STRDS)
+ COPYRIGHT:    (C) 2021 by stefan.blumentrath, and the GRASS Development Team
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+"""
 
 #%module
 #% description: Import netCDF files that adhere to the CF convention as STRDS.
@@ -223,7 +223,7 @@ from grass.temporal.datetime_math import datetime_to_grass_datetime_string
 # Datasets may contain several layers
 # r.external registers all bands by default
 
-resample_dict = {
+RESAMPLE_DICT = {
     "gdal": {
         "nearest": "near",
         "bilinear": "bilinear",
@@ -429,29 +429,29 @@ def get_import_type(url, projection_match, resample, flags_dict):
                 )
             )
             import_type = "r.external"
-            if resample not in resample_dict["gdal"]:
+            if resample not in RESAMPLE_DICT["gdal"]:
                 gscript.fatal(
                     _(
                         "For re-projection with gdalwarp only the following "
                         "resample methods are allowed: {}".format(
-                            ", ".join(list(resample_dict["gdal"].keys()))
+                            ", ".join(list(RESAMPLE_DICT["gdal"].keys()))
                         )
                     )
                 )
-            resample = resample_dict["gdal"][resample]
+            resample = RESAMPLE_DICT["gdal"][resample]
 
         else:
             import_type = "r.import"
-            if resample not in resample_dict["grass"]:
+            if resample not in RESAMPLE_DICT["grass"]:
                 gscript.fatal(
                     _(
                         "For re-projection with r.import only the following "
                         "resample methods are allowed: {}".format(
-                            ", ".join(list(resample_dict["grass"].keys()))
+                            ", ".join(list(RESAMPLE_DICT["grass"].keys()))
                         )
                     )
                 )
-            resample = resample_dict["grass"][resample]
+            resample = RESAMPLE_DICT["grass"][resample]
     elif flags_dict["l"]:
         import_type, resample = "r.external", None
     else:
@@ -508,7 +508,7 @@ def get_end_time(start_time_dimensions):
 # import or link data
 def read_data(
     input_url,
-    rastercount,
+    # rastercount,
     metadata,
     options_dict,
     import_type,
@@ -784,9 +784,9 @@ def main():
             sds = [s for s in sds if s[0] in semantic_label.keys()]
 
         # Open subdatasets to get metadata
-        if len(sds) > 0:  # and ncdf.RasterCount == 0:
+        if sds:  # and ncdf.RasterCount == 0:
             sds = [[gdal.Open(s[1])] + s for s in sds]
-        elif len(sds) == 0 and ncdf.RasterCount == 0:
+        elif not sds and ncdf.RasterCount == 0:
             gscript.warning(_("No data to import from file {}").format(in_url))
             continue
         else:
@@ -798,48 +798,48 @@ def main():
         inputs_dict[in_url] = {}
         inputs_dict[in_url]["sds"] = [
             {
-                "id": sd[1],
-                "url": sd[0].GetDescription(),
+                "id": s_d[1],
+                "url": s_d[0].GetDescription(),
                 "grass_metadata": get_metadata(
-                    sd[0].GetMetadata(), sd[1], semantic_label
+                    s_d[0].GetMetadata(), s_d[1], semantic_label
                 ),
-                "extended_metadata": sd[0].GetMetadata(),
-                "time_dimensions": get_time_dimensions(sd[0].GetMetadata()),
-                "rastercount": sd[0].RasterCount,
+                "extended_metadata": s_d[0].GetMetadata(),
+                "time_dimensions": get_time_dimensions(s_d[0].GetMetadata()),
+                "rastercount": s_d[0].RasterCount,
             }
-            for sd in sds
-            if "NETCDF_DIM_time_VALUES" in sd[0].GetMetadata()
+            for s_d in sds
+            if "NETCDF_DIM_time_VALUES" in s_d[0].GetMetadata()
         ]
 
         # Close open GDAL datasets
         sds = None
 
         # Apply temporal filter
-        for sd in inputs_dict[in_url]["sds"]:
-            end_times = get_end_time(sd["time_dimensions"])
+        for s_d in inputs_dict[in_url]["sds"]:
+            end_times = get_end_time(s_d["time_dimensions"])
             requested_time_dimensions = np.array(
                 [
                     apply_temporal_filter(
                         valid_window, valid_relations, start, end_times[idx]
                     )
-                    for idx, start in enumerate(sd["time_dimensions"])
+                    for idx, start in enumerate(s_d["time_dimensions"])
                 ]
             )
             if not requested_time_dimensions.any():
                 gscript.warning(
                     _(
                         "Nothing to import from subdataset {s} in {f}".format(
-                            s=sd["id"], f=sd["url"]
+                            s=s_d["id"], f=s_d["url"]
                         )
                     )
                 )
-                inputs_dict[in_url]["sds"].remove(sd)
+                inputs_dict[in_url]["sds"].remove(s_d)
             else:
-                sd["start_time_dimensions"] = sd["time_dimensions"][
+                s_d["start_time_dimensions"] = s_d["time_dimensions"][
                     requested_time_dimensions
                 ]
-                sd["end_time_dimensions"] = end_times[requested_time_dimensions]
-                sd["requested_time_dimensions"] = np.where(requested_time_dimensions)[0]
+                s_d["end_time_dimensions"] = end_times[requested_time_dimensions]
+                s_d["requested_time_dimensions"] = np.where(requested_time_dimensions)[0]
 
     if options["print"] in ["grass", "extended"]:
         # ["|".join([[s["url"], s["id"]] + s["extended_metadata"].values])
@@ -856,14 +856,14 @@ def main():
                 [
                     sep.join(
                         [
-                            sd["id"],
-                            sd["url"],
-                            str(sd["rastercount"]),
-                            str(len(sd["time_dimensions"])),
+                            s_d["id"],
+                            s_d["url"],
+                            str(s_d["rastercount"]),
+                            str(len(s_d["time_dimensions"])),
                         ]
-                        + list(map(str, sd[print_type].values()))
+                        + list(map(str, s_d[print_type].values()))
                     )
-                    for sd in chain.from_iterable(
+                    for s_d in chain.from_iterable(
                         [i["sds"] for i in inputs_dict.values()]
                     )
                 ]
@@ -889,11 +889,11 @@ def main():
     for sds in inputs_dict.values():
 
         # Here loop over subdatasets ()
-        for sd in sds["sds"]:
+        for s_d in sds["sds"]:
 
             strds_name = (
-                "{}_{}".format(options["output"], sd["id"])
-                if sd["id"] and not semantic_label
+                "{}_{}".format(options["output"], s_d["id"])
+                if s_d["id"] and not semantic_label
                 else options["output"]
             )
 
@@ -906,8 +906,8 @@ def main():
                         strds_name,
                         "strds",  # type
                         "absolute",  # temporaltype
-                        sd["grass_metadata"]["title"],
-                        sd["grass_metadata"]["description"],
+                        s_d["grass_metadata"]["title"],
+                        s_d["grass_metadata"]["description"],
                         "mean",  # semanticstype
                         None,  # dbif
                         gscript.overwrite,
@@ -923,19 +923,19 @@ def main():
                 existing_strds.append(strds_name)
 
             import_module, resample = get_import_type(
-                sd["url"], sds["proj_match"], options["resample"], flags
+                s_d["url"], sds["proj_match"], options["resample"], flags
             )
             queueing_input.append(
                 (
-                    sd["url"],
-                    sd["rastercount"],
-                    sd["grass_metadata"],
+                    s_d["url"],
+                    # s_d["rastercount"],
+                    s_d["grass_metadata"],
                     options,
                     import_module,
                     flags,
-                    sd["start_time_dimensions"],
-                    sd["end_time_dimensions"],
-                    sd["requested_time_dimensions"],
+                    s_d["start_time_dimensions"],
+                    s_d["end_time_dimensions"],
+                    s_d["requested_time_dimensions"],
                     grass_env,
                     sds["proj_match"],
                     resample,
@@ -952,10 +952,10 @@ def main():
         queued_modules.extend(qres[2])
 
     queue = ParallelModuleQueue(nprocs=options["nprocs"])
-    for mm in queued_modules:
+    for m_m in queued_modules:
         queue.put(
             MultiModule(
-                module_list=mm,
+                module_list=m_m,
                 sync=True,
                 set_temp_region=False,
             )
@@ -969,8 +969,8 @@ def main():
             map_file = StringIO("\n".join(r_maps))
         else:
             map_file = gscript.tempfile()
-            with open(map_file, "w") as mf:
-                mf.write("\n".join(r_maps))
+            with open(map_file, "w") as m_f:
+                m_f.write("\n".join(r_maps))
         register_maps_in_space_time_dataset(
             "raster",
             strds_name + "@" + grass_env["MAPSET"],
