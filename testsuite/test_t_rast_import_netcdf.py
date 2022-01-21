@@ -91,7 +91,7 @@ class TestNetCDFImport(TestCase):
             flags="lo",
             input=self.input_sentinel[0],
             output=self.output_sentinel,
-            bandref="bandref_2.conf",
+            semantic_label="bandref_2.conf",
             memory=2048,
             nprocs=2,
         )
@@ -99,7 +99,7 @@ class TestNetCDFImport(TestCase):
         # Adjust to STRDS
         # self.assertRasterExists(self.output, msg="Output was not created")
 
-    def test_sentinel_no_bandref(self):
+    def test_sentinel_no_semantic_label(self):
         """Check that the output is created"""
         # run the import module
         self.assertModule(
@@ -123,7 +123,7 @@ class TestNetCDFImport(TestCase):
             flags="lo",
             input=self.input_sentinel[0],
             output=self.output_sentinel,
-            bandref="bandref_2.conf",
+            semantic_label="bandref_2.conf",
             memory=2048,
             nprocs=2,
         )
@@ -132,7 +132,7 @@ class TestNetCDFImport(TestCase):
             flags="loa",
             input=self.input_sentinel[1],
             output=self.output_sentinel,
-            bandref="bandref_2.conf",
+            semantic_label="bandref_2.conf",
             memory=2048,
             nprocs=2,
         )
@@ -144,7 +144,7 @@ class TestNetCDFImport(TestCase):
             flags="lo",
             input=",".join(self.input_sentinel),
             output=self.output_sentinel,
-            bandref="bandref_2.conf",
+            semantic_label="bandref_2.conf",
             memory=2048,
             nprocs=2,
         )
@@ -158,7 +158,7 @@ class TestNetCDFImport(TestCase):
             flags="lo",
             input=self.input_file,
             output=self.output_sentinel,
-            bandref="bandref_2.conf",
+            semantic_label="bandref_2.conf",
             memory=2048,
             nprocs=2,
         )
@@ -170,7 +170,7 @@ class TestNetCDFImport(TestCase):
             flags="lo",
             input=self.input_climate,
             output=self.output_climate,
-            bandref="bandref_sn.conf",
+            semantic_label="bandref_sn.conf",
             start_time="2021-01-01",
             end_time="2021-01-03 12:12:12",
             memory=2048,
