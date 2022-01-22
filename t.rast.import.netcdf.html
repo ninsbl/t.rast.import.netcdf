@@ -2,7 +2,7 @@
 
 <em>t.rast.import.netcdf</em> imports content of one or more NetCDF files into a
 GRASS GIS Space Time Raster Dataset (STRDS). NetCDF files are expected to follow
-the CF-convention. Files not adhearing to those standards are likely to fail
+the CF-convention. Files not adhering to those standards are likely to fail
 to import.
 
 <p>
@@ -22,15 +22,15 @@ are supposed to be linked only.
 
 <p>
 Starting with GRASS GIS version 8.0, different variables or subdatasets in a
-NetCDF file can be imported as "band reference" into one STRDS. To achieve this,
-a configuration file has to be provided in the <b>bandref</b> option, that maps
-subdatasets in the NetCDF file to GRASS GIS band references. Each line in that
+NetCDF file can be imported as "semantic_label" into one STRDS. To achieve this,
+a configuration file has to be provided in the <b>semantic_labels</b> option, that maps
+subdatasets in the NetCDF file to GRASS GIS semantic_labels. Each line in that
 file must have the following format:
 <code>
 input_netcdf_subdataset=grass_gis_band_reference
 </code>
 The equal sign <i>=</i> is required.
-If a band references configuration file is provided, the import of subdatasets
+If a semantic_labels configuration file is provided, the import of subdatasets
 is limited to those subdatasets listed in that file.
 
 <h2>KNOWN ISSUES</h2>
@@ -39,7 +39,7 @@ that contains subdatasets, as import of those is currently not supported in
 <em>r.external</em>.
 
 <h2>REQUIREMENTS</h2>
-Support of band references is only available with GRASS GIS 8.0 or later.
+Support of semantic_labels is only available with GRASS GIS 8.0 or later.
 <em>t.rast.import.netcdf</em> uses the following non-standard Python modules:
 <ul>
 <li><a href="https://pypi.org/project/numpy">numpy</a></li>
@@ -54,24 +54,24 @@ Support of band references is only available with GRASS GIS 8.0 or later.
 echo "https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc
 https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T32VNL_20210228T201033_DTERRENGDATA.nc" > nc.txt
 
-# Create a band reference configuraton file
+# Create a semantic_label configuration file
 echo "B1=S2_1
-B2=S2_2" > bandref.conf
+B2=S2_2" > semantic_labels.conf
 
 # Import data (link NetCDF files without downloading them)
-t.rast.import.netcdf -l input=nc.txt output=S2A bandref=bandref.conf memory=2048 \
-nprocs=2 nodata="-1"
+t.rast.import.netcdf -l input=nc.txt output=S2A semantic_labels=semantic_labels.conf \
+memory=2048 nprocs=2 nodata="-1"
 </pre></div>
 
 <h3>Import Norwegian Climate data</h3>
 <div class="code"><pre>
-# Create a band reference configuraton file
+# Create a semantic_label configuration file
 echo "tg=temperature_avg
-tn=temperature_min" > bandref.conf
+tn=temperature_min" > semantic_labels.conf
 
 # Import data within a selected time window
-t.rast.import.netcdf output=SeNorge bandref=bandref.conf memory=2048 nprocs=2 \
-start_time="2020-08-01" end_time="2021-08-01" \
+t.rast.import.netcdf output=SeNorge semantic_labels=semantic_labels.conf \
+memory=2048 nprocs=2 start_time="2020-08-01" end_time="2021-08-01" \
 input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2018/Archive/seNorge2018_2020.nc
 </pre></div>
 
@@ -79,13 +79,13 @@ input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2018/Archive/seN
 <div class="code"><pre>
 # Choose dataset to import (see also m.crawl.thredds module)
 
-# Create a band reference configuraton file
+# Create a semantic_label configuration file
 echo "tg=temperature_avg
-tn=temperature_min" > bandref.conf
+tn=temperature_min" > semantic_labels.conf
 
 # Import data within a selected time window
-t.rast.import.netcdf output=SeNorge bandref=bandref.conf memory=2048 nprocs=2 -a \
-start_time="2020-08-01" end_time="2021-08-01" \
+t.rast.import.netcdf output=SeNorge semantic_labels=semantic_labels.conf \
+memory=2048 nprocs=2 -a start_time="2020-08-01" end_time="2021-08-01" \
 input=https://thredds.met.no/thredds/fileServer/senorge/seNorge_2018/Archive/seNorge2018_2021.nc
 </pre></div>
 
