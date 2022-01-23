@@ -105,6 +105,6 @@ jobs:
         grass ~/grasstmploc/PERMANENT --exec g.download.location url=https://grass.osgeo.org/sampledata/north_carolina/nc_spm_08_grass7.tar.gz --verbose
     - name: Run test (manually specified files)
       run: |
-        cd testsuite/
+        cd t.rast.import.netcdf/testsuite/
         grass -c ~/nc_spm_08_grass7/test --exec ./test_t_rast_import_netcdf.py
         rm -rf ~/nc_spm_08_grass7/test
