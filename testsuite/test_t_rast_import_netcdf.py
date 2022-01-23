@@ -99,21 +99,21 @@ class TestNetCDFImport(TestCase):
         # Adjust to STRDS
         # self.assertRasterExists(self.output, msg="Output was not created")
 
-    # def test_sentinel_no_semantic_label(self):
-    #     """Check that the output is created"""
-    #     # run the import module
-    #     self.assertModule(
-    #         "t.rast.import.netcdf",
-    #         flags="lo",
-    #         input=self.input_sentinel[0],
-    #         output=self.output_sentinel,
-    #         memory=2048,
-    #         nprocs=2,
-    #         nodata=-1,
-    #     )
-    #     # check to see if output is in mapset
-    #     # Adjust to STRDS
-    #     # self.assertRasterExists(self.output, msg="Output was not created")
+     def test_sentinel_fast_no_semantic_label(self):
+        """Check that the output is created"""
+        # run the import module
+        self.assertModule(
+            "t.rast.import.netcdf",
+            flags="fo",
+            input=self.input_sentinel[0],
+            output=self.output_sentinel,
+            memory=2048,
+            nprocs=2,
+            nodata=-1,
+        )
+        # check to see if output is in mapset
+        # Adjust to STRDS
+        # self.assertRasterExists(self.output, msg="Output was not created")
 
     def test_sentinel_output_appended(self):
         """Check that the output is created"""
