@@ -1,0 +1,39 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install GRASS GIS and other dependencies
+      run: |
+        sudo add-apt-repository -y ppa:ubuntugis/ubuntugis-unstable
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq grass grass-dev grass-doc wget
+        sudo python3 -m pip install --upgrade numpy thredds_crawler cf_units
+    - name: Create a temporary location
+      run: |
+        grass -c EPSG:4326 ~/grasstmploc -e
+    - name: Install the module
+      run: |
+        grass --tmp-location XY --exec g.extension extension=${{ github.event.repository.name }} url=. --verbose
+    - name: Cache data for testing
+      id: cache-nc_spm_08_grass7
+      uses: actions/cache@v1
+      with:
+        path: nc_spm_08_grass7
+        key: ${{ runner.os }}-nc_spm_08_grass7
+    - name: Get sample data for testing (NC SPM sample location)
+      if: steps.cache-nc_spm_08_grass7.outputs.cache-hit != 'true'
+      run: |
+        grass --tmp-location XY --exec g.extension extension=g.download.location --verbose
+        grass ~/grasstmploc/PERMANENT --exec g.download.location url=https://grass.osgeo.org/sampledata/north_carolina/nc_spm_08_grass7.tar.gz --verbose
+    - name: Run test (manually specified files)
+      run: |
+        cd testsuite/
+        grass -c ~/nc_spm_08_grass7/test --exec ./test_t_rast_import_netcdf.py
+        rm -rf ~/nc_spm_08_grass7/test
