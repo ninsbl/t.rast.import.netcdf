@@ -38,13 +38,13 @@ jobs:
     - name: Checkout addons
       uses: actions/checkout@v2
       with:
-        path: grass-addons
+        path: t.rast.import.netcdf
 
     - name: Get dependencies
       run: |
         sudo apt-get update -y
         sudo apt-get install -y wget git gawk findutils
-        xargs -a <(awk '! /^ *(#|$)/' "grass-addons/.github/workflows/apt.txt") -r -- \
+        xargs -a <(awk '! /^ *(#|$)/' "t.rast.import.netcdf/.github/workflows/apt.txt") -r -- \
             sudo apt-get install -y --no-install-recommends --no-install-suggests
 
     - name: Set up Python ${{ matrix.python-version }} as default Python
@@ -55,7 +55,7 @@ jobs:
     - name: Get Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r grass-addons/.github/workflows/requirements.txt
+        pip install --upgrade numpy thredds_crawler cf_units
 
     - name: Create installation directory
       run: |
@@ -72,7 +72,7 @@ jobs:
     - name: Build GRASS GIS core
       run: |
         cd grass
-        ../grass-addons/.github/workflows/build_grass.sh $HOME/install
+        ../t.rast.import.netcdf/.github/workflows/build_grass.sh $HOME/install
 
     - name: Add the bin directory to PATH
       run: |
@@ -82,34 +82,27 @@ jobs:
       run: |
         if [ ! -e $HOME/install/bin/grass ] ; then ln -s $HOME/install/bin/grass* $HOME/install/bin/grass ; fi
 
-    - name: Build addons
-      run: |
-        cd grass-addons/src
-        GRASS_INSTALL=$HOME/install/grass*
-        make MODULE_TOPDIR=$GRASS_INSTALL
-
     - name: Get extra Python dependencies
       run: |
         export GDAL_VERSION=$(gdal-config --version)
-        pip install -r grass-addons/.github/workflows/extra_requirements.txt
+        pip install -r t.rast.import.netcdf/.github/workflows/extra_requirements.txt
 
-    - name: Set up R
-      uses: r-lib/actions/setup-r@v1
-      with:
-        r-version: "4.0.4"
-
-    - name: Get R dependencies
+    - name: Install the module
       run: |
-        grass-addons/.github/workflows/install_r_packages.R
-
-    - name: Run tests
-      run: |
-        cd grass-addons/src
-        ../.github/workflows/test.sh
-
-    - name: Make HTML test report available
-      uses: actions/upload-artifact@v2
+        grass --tmp-location XY --exec g.extension extension=${{ github.event.repository.name }} url=. --verbose
+    - name: Cache data for testing
+      id: cache-nc_spm_08_grass7
+      uses: actions/cache@v1
       with:
-        name: testreport-grass-${{ matrix.grass-version }}-python-${{ matrix.python-version }}
-        path: grass-addons/src/testreport
-        retention-days: 3
+        path: nc_spm_08_grass7
+        key: ${{ runner.os }}-nc_spm_08_grass7
+    - name: Get sample data for testing (NC SPM sample location)
+      if: steps.cache-nc_spm_08_grass7.outputs.cache-hit != 'true'
+      run: |
+        grass --tmp-location XY --exec g.extension extension=g.download.location --verbose
+        grass ~/grasstmploc/PERMANENT --exec g.download.location url=https://grass.osgeo.org/sampledata/north_carolina/nc_spm_08_grass7.tar.gz --verbose
+    - name: Run test (manually specified files)
+      run: |
+        cd testsuite/
+        grass -c ~/nc_spm_08_grass7/test --exec ./test_t_rast_import_netcdf.py
+        rm -rf ~/nc_spm_08_grass7/test
