@@ -47,6 +47,12 @@
 #%end
 
 #%flag
+#% key: f
+#% description: Link the raster files in a fast way, without reading metadata using r.external
+#% guisection: Settings
+#%end
+
+#%flag
 #% key: e
 #% description: Extend location extents based on new dataset
 #% guisection: Settings
@@ -420,7 +426,7 @@ def get_import_type(url, projection_match, resample, flags_dict):
                 )
             )
             resample = "nearest"
-        if flags_dict["l"]:
+        if flags_dict["l"] or flags_dict["f"]:
             gscript.warning(
                 _(
                     "Cannot link {} directly, using a warped virtual raster through GDAL".format(
@@ -529,7 +535,7 @@ def read_data(
     imp_flags = "o" if flags_dict["o"] else ""
     # Requires GRASS GIS >= 8.0
     if import_type == "r.external" and GRASS_VERSION[0] >= 8:
-        imp_flags += "m"
+        imp_flags += "r" if flags_dict["f"] else "m"
     # r.external [-feahvtr]
     # r.import [-enl]
     # r.in.gdal [-eflakcrp]
