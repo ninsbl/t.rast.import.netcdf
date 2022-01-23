@@ -99,7 +99,7 @@ class TestNetCDFImport(TestCase):
         # Adjust to STRDS
         # self.assertRasterExists(self.output, msg="Output was not created")
 
-     def test_sentinel_fast_no_semantic_label(self):
+    def test_sentinel_fast_no_semantic_label(self):
         """Check that the output is created"""
         # run the import module
         self.assertModule(
