@@ -692,7 +692,7 @@ def main():
                 "Please install it with (pip install cf-units)"
             )
         )
-  
+
     # Check if NetCDF driver is available
     if not gdal.GetDriverByName("netCDF"):
         gscript.fatal(
