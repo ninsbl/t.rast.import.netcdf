@@ -686,7 +686,7 @@ def main():
     try:
         import cf_units
     except ImportError:
-       gscript.fatal(
+        gscript.fatal(
             _(
                 "Cannot import Python library 'cf-units'\n"
                 "Please install it with (pip install cf-units)"
