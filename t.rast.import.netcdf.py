@@ -213,9 +213,6 @@ import numpy as np
 
 # import dateutil.parser as parser
 
-from osgeo import gdal
-import cf_units
-
 import grass.script as gscript
 import grass.temporal as tgis
 from grass.pygrass.modules import Module, MultiModule, ParallelModuleQueue
@@ -992,5 +989,19 @@ def main():
 
 
 if __name__ == "__main__":
+    # lazy imports
+    try:
+        from osgeo import gdal
+    except ImportError:
+        gscript.fatal(_("Cannot import Python bindings for 'gdal'\n"
+                        "Please install them e.g. from system package 'apt install python3-gdal'"
+                       ))
+    try:
+        import cf_units
+    except ImportError:
+        gscript.fatal(_("Cannot import Python library 'cf-units'\n"
+                        "Please install it with 'python3 -m pip install cf-units'"
+                       ))
+
     options, flags = gscript.parser()
     sys.exit(main())
