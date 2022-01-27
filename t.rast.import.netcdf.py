@@ -695,7 +695,6 @@ def main():
             )
         )
 
-
     # Check if NetCDF driver is available
     if not gdal.GetDriverByName("netCDF"):
         gscript.fatal(
