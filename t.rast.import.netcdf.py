@@ -675,7 +675,7 @@ def main():
     try:
         from osgeo import gdal
     except ImportError:
-        grass.fatal(
+        gscript.fatal(
             _(
                 "Unable to load GDAL Python bindings (requires "
                 "package 'python-gdal' or Python library GDAL "
@@ -686,7 +686,7 @@ def main():
     try:
         import cf_units
     except ImportError:
-        grass.fatal(
+       gscript.fatal(
             _(
                 "Cannot import Python library 'cf-units'\n"
                 "Please install it with (pip install cf-units)"
