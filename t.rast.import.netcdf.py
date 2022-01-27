@@ -671,6 +671,31 @@ def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
 def main():
     """run the main workflow"""
 
+    # lazy imports
+    global gdal
+    try:
+        from osgeo import gdal
+    except ImportError:
+        gscript.fatal(
+            _(
+                "Unable to load GDAL Python bindings (requires "
+                "package 'python-gdal' or Python library GDAL "
+                "to be installed)."
+            )
+        )
+
+    global cf_units
+    try:
+        import cf_units
+    except ImportError:
+        gscript.fatal(
+            _(
+                "Cannot import Python library 'cf-units'\n"
+                "Please install it with (pip install cf-units)"
+            )
+        )
+
+
     # Check if NetCDF driver is available
     if not gdal.GetDriverByName("netCDF"):
         gscript.fatal(
@@ -991,25 +1016,3 @@ def main():
 if __name__ == "__main__":
     options, flags = gscript.parser()
     sys.exit(main())
-
-    # lazy imports
-    try:
-        from osgeo import gdal
-    except ImportError:
-        gscript.fatal(
-            _(
-                "Unable to load GDAL Python bindings (requires "
-                "package 'python-gdal' or Python library GDAL "
-                "to be installed)."
-            )
-        )
-
-    try:
-        import cf_units
-    except ImportError:
-        gscript.fatal(
-            _(
-                "Cannot import Python library 'cf-units'\n"
-                "Please install it with (pip install cf-units)"
-            )
-        )
