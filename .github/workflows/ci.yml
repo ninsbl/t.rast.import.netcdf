@@ -7,6 +7,10 @@ on:
   # 01:00 Pacific Time (in UTC), every day (late night PT)
   - cron:  '0 8 * * *'
 
+env:
+  # Workaround for bug in GDAL 3.3.2 that fails on creating USERFAULTFD
+  CPL_ENABLE_USERFAULTFD: NO
+
 jobs:
   build:
     name: ${{ matrix.grass-version }} (Python ${{ matrix.python-version }})
