@@ -89,6 +89,10 @@ jobs:
         export GDAL_VERSION=$(gdal-config --version)
         pip install -r t.rast.import.netcdf/.github/workflows/extra_requirements.txt
 
+    - name: Check libs
+      run: |
+        nc-config --all
+        gdalinfo --formats | grep -i netcdf
     - name: Install the module
       run: |
         grass --tmp-location XY --exec g.extension extension=t.rast.import.netcdf url=t.rast.import.netcdf/ --verbose
