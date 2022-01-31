@@ -107,5 +107,6 @@ jobs:
     - name: Run test (manually specified files)
       run: |
         cd t.rast.import.netcdf/testsuite/
+        export CPL_ENABLE_USERFAULTFD=NO
         grass -c ~/nc_spm_08_grass7/test --exec ./test_t_rast_import_netcdf.py
         rm -rf ~/nc_spm_08_grass7/test
