@@ -410,7 +410,7 @@ def check_projection_match(url):
     return projection_match
 
 
-def get_import_type(url, projection_match, resample, flags_dict):
+def get_import_type(url, projection_match, resample, flags_dict, gisenv):
     """Define import type ("r.in.gdal", "r.import", "r.external")"""
 
     if not projection_match and not flags_dict["o"]:
@@ -459,6 +459,14 @@ def get_import_type(url, projection_match, resample, flags_dict):
         import_type, resample = "r.external", None
     else:
         import_type, resample = "r.in.gdal", None
+
+    # Create directory for vrt files if needed and does not exist
+    if import_type == "r.external":
+        vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
+            gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
+        )
+        if not vrt_dir.is_dir():
+            vrt_dir.mkdir()
 
     return import_type, resample
 
@@ -615,9 +623,6 @@ def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
     vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
         gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
     )
-    # current_region = gscript.region()
-    if not vrt_dir.is_dir():
-        vrt_dir.mkdir()
     vrt_name = str(
         vrt_dir.joinpath(
             "netcdf_{}.vrt".format(legalize_name_string(Path(subdataset_url).name))
@@ -735,7 +740,7 @@ def main():
     ]
 
     for in_url in inputs:
-        # MAybe other suffixes are valid too?
+        # Maybe other suffixes are valid too?
         if not in_url.endswith(".nc"):
             gscript.fatal(_("<{}> does not seem to be a NetCDF file".format(in_url)))
 
@@ -952,7 +957,7 @@ def main():
                 existing_strds.append(strds_name)
 
             import_module, resample = get_import_type(
-                s_d["url"], sds["proj_match"], options["resample"], flags
+                s_d["url"], sds["proj_match"], options["resample"], flags, grass_env
             )
             queueing_input.append(
                 (
