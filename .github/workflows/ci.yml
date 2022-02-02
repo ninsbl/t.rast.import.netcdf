@@ -70,9 +70,11 @@ jobs:
       run: |
         echo "LD_LIBRARY_PATH=$HOME/install/lib" >> $GITHUB_ENV
 
-    - name: Check gdal command
+    - name: Check gdal
       run: |
-        gdalinfo -if netCDF "/vsicurl/https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc"
+        gdalinfo --version
+        gdalinfo --formats
+        gdalinfo "/vsicurl/https://nbstds.met.no/thredds/fileServer/NBS/S2A/2021/02/28/S2A_MSIL1C_20210228T103021_N0202_R108_T35WPU_20210228T201033_DTERRENGDATA.nc"
 
     - name: Build GRASS GIS core
       run: |
