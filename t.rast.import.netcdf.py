@@ -19,177 +19,177 @@
 
 """
 
-#%module
-#% description: Import netCDF files that adhere to the CF convention as STRDS.
-#% keyword: temporal
-#% keyword: import
-#% keyword: raster
-#% keyword: time
-#% keyword: netcdf
-#%end
+# %module
+# % description: Import netCDF files that adhere to the CF convention as STRDS.
+# % keyword: temporal
+# % keyword: import
+# % keyword: raster
+# % keyword: time
+# % keyword: netcdf
+# %end
 
-#%flag
-#% key: a
-#% description: Append to STRDS
-#% guisection: Settings
-#%end
+# %flag
+# % key: a
+# % description: Append to STRDS
+# % guisection: Settings
+# %end
 
-#%flag
-#% key: r
-#% description: Import only within current region
-#% guisection: Filter
-#%end
+# %flag
+# % key: r
+# % description: Import only within current region
+# % guisection: Filter
+# %end
 
-#%flag
-#% key: l
-#% description: Link the raster files using r.external
-#% guisection: Settings
-#%end
+# %flag
+# % key: l
+# % description: Link the raster files using r.external
+# % guisection: Settings
+# %end
 
-#%flag
-#% key: f
-#% description: Link the raster files in a fast way, without reading metadata using r.external
-#% guisection: Settings
-#%end
+# %flag
+# % key: f
+# % description: Link the raster files in a fast way, without reading metadata using r.external
+# % guisection: Settings
+# %end
 
-#%flag
-#% key: e
-#% description: Extend location extents based on new dataset
-#% guisection: Settings
-#%end
+# %flag
+# % key: e
+# % description: Extend location extents based on new dataset
+# % guisection: Settings
+# %end
 
-#%flag
-#% key: o
-#% label: Override projection check (use current location's projection)
-#% description: Assume that the dataset has same projection as the current location
-#% guisection: Settings
-#%end
+# %flag
+# % key: o
+# % label: Override projection check (use current location's projection)
+# % description: Assume that the dataset has same projection as the current location
+# % guisection: Settings
+# %end
 
-#%option G_OPT_F_INPUT
-#% key: input
-#% type: string
-#% required: yes
-#% multiple: no
-#% key_desc: Input file(s) ("-" = stdin)
-#% description: URL or name of input netcdf-file ("-" = stdin)
-#%end
+# %option G_OPT_F_INPUT
+# % key: input
+# % type: string
+# % required: yes
+# % multiple: no
+# % key_desc: Input file(s) ("-" = stdin)
+# % description: URL or name of input netcdf-file ("-" = stdin)
+# %end
 
-#%option G_OPT_F_INPUT
-#% key: semantic_labels
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: Input file with configuration for semantic labels ("-" = stdin)
-#% description: File with mapping of variables or subdatasets to semantic labels
-#% guisection: Settings
-#%end
+# %option G_OPT_F_INPUT
+# % key: semantic_labels
+# % type: string
+# % required: no
+# % multiple: no
+# % key_desc: Input file with configuration for semantic labels ("-" = stdin)
+# % description: File with mapping of variables or subdatasets to semantic labels
+# % guisection: Settings
+# %end
 
-#%option G_OPT_STRDS_OUTPUT
-#% required: no
-#% multiple: no
-#% description: Name of the output space time raster dataset
-#%end
+# %option G_OPT_STRDS_OUTPUT
+# % required: no
+# % multiple: no
+# % description: Name of the output space time raster dataset
+# %end
 
-#%option
-#% key: end_time
-#% label: Latest timestamp of temporal extent to include in the output
-#% description: Timestamp of format "YYYY-MM-DD HH:MM:SS"
-#% type: string
-#% required: no
-#% multiple: no
-#% guisection: Filter
-#%end
+# %option
+# % key: end_time
+# % label: Latest timestamp of temporal extent to include in the output
+# % description: Timestamp of format "YYYY-MM-DD HH:MM:SS"
+# % type: string
+# % required: no
+# % multiple: no
+# % guisection: Filter
+# %end
 
-#%option
-#% key: start_time
-#% label: Earliest timestamp of temporal extent to include in the output
-#% description: Timestamp of format "YYYY-MM-DD HH:MM:SS"
-#% type: string
-#% required: no
-#% multiple: no
-#% guisection: Filter
-#%end
+# %option
+# % key: start_time
+# % label: Earliest timestamp of temporal extent to include in the output
+# % description: Timestamp of format "YYYY-MM-DD HH:MM:SS"
+# % type: string
+# % required: no
+# % multiple: no
+# % guisection: Filter
+# %end
 
-#%option
-#% key: temporal_relations
-#% label: Allowed temporal relation for temporal filtering
-#% description: Allowed temporal relation between time dimension in the netCDF file and temporal window defined by start_time and end_time
-#% type: string
-#% required: no
-#% multiple: yes
-#% options: equal,during,contains,overlaps,overlapped,starts,started,finishes,finished
-#% answer: equal,during,contains,overlaps,overlapped,starts,started,finishes,finished
-#% guisection: Filter
-#%end
+# %option
+# % key: temporal_relations
+# % label: Allowed temporal relation for temporal filtering
+# % description: Allowed temporal relation between time dimension in the netCDF file and temporal window defined by start_time and end_time
+# % type: string
+# % required: no
+# % multiple: yes
+# % options: equal,during,contains,overlaps,overlapped,starts,started,finishes,finished
+# % answer: equal,during,contains,overlaps,overlapped,starts,started,finishes,finished
+# % guisection: Filter
+# %end
 
-#%option
-#% key: resample
-#% type: string
-#% required: no
-#% multiple: no
-#% label: Resampling method when data is reprojected
-#% options: nearest,bilinear,bilinear_f,bicubic,bicubic_f,cubicspline,lanczos,lanczos_f,min,Q1,average,med,Q3,max,mode
-#% guisection: Settings
-#%end
+# %option
+# % key: resample
+# % type: string
+# % required: no
+# % multiple: no
+# % label: Resampling method when data is reprojected
+# % options: nearest,bilinear,bilinear_f,bicubic,bicubic_f,cubicspline,lanczos,lanczos_f,min,Q1,average,med,Q3,max,mode
+# % guisection: Settings
+# %end
 
-#%option
-#% key: print
-#% type: string
-#% required: no
-#% multiple: no
-#% label: Print metadata and exit
-#% options: extended, grass
-#% guisection: Print
-#%end
+# %option
+# % key: print
+# % type: string
+# % required: no
+# % multiple: no
+# % label: Print metadata and exit
+# % options: extended, grass
+# % guisection: Print
+# %end
 
-#%option G_OPT_M_COLR
-#% description: Color table to assign to imported datasets
-#% answer: viridis
-#% guisection: Settings
-#%end
+# %option G_OPT_M_COLR
+# % description: Color table to assign to imported datasets
+# % answer: viridis
+# % guisection: Settings
+# %end
 
-#%option
-#% key: memory
-#% type: integer
-#% required: no
-#% multiple: no
-#% key_desc: memory in MB
-#% label: Maximum memory to be used (in MB)
-#% description: Cache size for raster rows
-#% answer: 300
-#% guisection: Settings
-#%end
+# %option
+# % key: memory
+# % type: integer
+# % required: no
+# % multiple: no
+# % key_desc: memory in MB
+# % label: Maximum memory to be used (in MB)
+# % description: Cache size for raster rows
+# % answer: 300
+# % guisection: Settings
+# %end
 
-#%option
-#% key: nprocs
-#% type: integer
-#% required: no
-#% multiple: no
-#% key_desc: Number of cores
-#% label: Number of cores to use during import
-#% answer: 1
-#% guisection: Settings
-#%end
+# %option
+# % key: nprocs
+# % type: integer
+# % required: no
+# % multiple: no
+# % key_desc: Number of cores
+# % label: Number of cores to use during import
+# % answer: 1
+# % guisection: Settings
+# %end
 
-#%option G_OPT_F_SEP
-#% guisection: Settings
-#%end
+# %option G_OPT_F_SEP
+# % guisection: Settings
+# %end
 
-#%rules
-#% excludes: -o,resample
-#% excludes: -l,-r
-#% excludes: print,output
-#% required: print,output
-#%end
+# %rules
+# % excludes: -o,resample
+# % excludes: -l,-r
+# % excludes: print,output
+# % required: print,output
+# %end
 
-#%option
-#% key: nodata
-#% type: string
-#% required: no
-#% multiple: yes
-#% key_desc: Source nodata
-#% description: Comma separated list of values representing nodata in the input dataset
-#%end
+# %option
+# % key: nodata
+# % type: string
+# % required: no
+# % multiple: yes
+# % key_desc: Source nodata
+# % description: Comma separated list of values representing nodata in the input dataset
+# %end
 
 # Todo:
 # Allow filtering based on metadata
@@ -205,7 +205,6 @@ from multiprocessing import Pool
 import os
 from pathlib import Path
 import re
-from subprocess import PIPE
 import sys
 
 
@@ -398,19 +397,16 @@ def get_metadata(netcdf_metadata, subdataset="", semantic_label=None):
     return meta
 
 
-def check_projection_match(url):
-    """Check if projections match"""
-    try:
-        projection_match = Module(
-            "r.in.gdal", input=url, flags="j", stderr_=PIPE, stdout_=PIPE
-        )
-        projection_match = True
-    except Exception:
-        projection_match = False
-    return projection_match
+def check_projection_match(reference_crs, subdataset):
+    """Check if projections match with projection of the location"""
+    # Rather use osr directly (this is somewhat time consuming)
+    subdataset_crs = subdataset.GetSpatialRef()
+    location_crs = osr.SpatialReference()
+    location_crs.ImportFromWkt(reference_crs)
+    return subdataset_crs.IsSame(location_crs)
 
 
-def get_import_type(url, projection_match, resample, flags_dict, gisenv):
+def get_import_type(url, projection_match, resample, flags_dict):
     """Define import type ("r.in.gdal", "r.import", "r.external")"""
 
     if not projection_match and not flags_dict["o"]:
@@ -460,15 +456,7 @@ def get_import_type(url, projection_match, resample, flags_dict, gisenv):
     else:
         import_type, resample = "r.in.gdal", None
 
-    # Create directory for vrt files if needed and does not exist
-    if import_type == "r.external":
-        vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
-            gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
-        )
-        if not vrt_dir.is_dir():
-            vrt_dir.mkdir()
-
-    return import_type, resample
+    return import_type, resample, projection_match
 
 
 def setup_temporal_filter(options_dict):
@@ -518,22 +506,24 @@ def get_end_time(start_time_dimensions):
 
 # import or link data
 def read_data(
-    input_url,
-    # rastercount,
-    metadata,
+    sds_dict,
     options_dict,
-    import_type,
     flags_dict,
-    start_time_dimensions,
-    end_time_dimensions,
-    requested_time_dimensions,
     gisenv,
-    projection_match,
-    resamp,
     nodata,
-    strds_name,
 ):
     """Import or link data and metadata"""
+
+    input_url = sds_dict["url"]
+    metadata = sds_dict["grass_metadata"]
+    import_type = sds_dict["import_options"][0]
+    start_time_dimensions = sds_dict["start_time_dimensions"]
+    end_time_dimensions = sds_dict["end_time_dimensions"]
+    requested_time_dimensions = sds_dict["requested_time_dimensions"]
+    projection_match = sds_dict["import_options"][2]
+    resamp = sds_dict["import_options"][1]
+    strds_name = sds_dict["strds_name"]
+
     maps = []
     queue = []
 
@@ -673,21 +663,124 @@ def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
     return vrt
 
 
-def main():
-    """run the main workflow"""
+def parse_netcdf(
+    in_url, semantic_label, location_crs, valid_window, valid_relations, options
+):
+    """Parse and check netcdf file to extract relevant metadata"""
 
-    # lazy imports
-    global gdal
+    inputs_dict = {}
+
+    # Check if file exists and readable
+    gscript.verbose(_("Processing {}".format(in_url)))
     try:
-        from osgeo import gdal
-    except ImportError:
-        gscript.fatal(
+        ncdf = gdal.Open(in_url)
+    except FileNotFoundError:
+        gscript.warning(_("Could not open <{}>.\nSkipping...".format(in_url)))
+        return None
+
+    # Get global metadata
+    ncdf_metadata = ncdf.GetMetadata()
+
+    # Get CF version
+    cf_version = ncdf_metadata.get("NC_GLOBAL#Conventions")
+
+    if cf_version is None or not cf_version.upper().startswith("CF"):
+        gscript.warning(
             _(
-                "Unable to load GDAL Python bindings (requires "
-                "package 'python-gdal' or Python library GDAL "
-                "to be installed)."
+                "Input netCDF file does not adhere to CF-standard. Import may fail or be incorrect."
             )
         )
+
+    # try:
+    #     creation_date = parser.parse(ncdf_metadata.get("NC_GLOBAL#creation_date"))
+    # except Exception:
+    #     creation_date = None
+
+    # Sub datasets containing variables have 3 dimensions (x,y,z)
+    sds = [
+        # SDS_ID, SDS_url, SDS_dimension
+        [sds[0].split(":")[-1], sds[0], len(sds[1].split(" ")[0].split("x"))]
+        for sds in ncdf.GetSubDatasets()
+        if len(sds[1].split(" ")[0].split("x")) == 3
+    ]
+
+    # Filter based on semantic_label if provided
+    if semantic_label is not None:
+        sds = [s for s in sds if s[0] in semantic_label.keys()]
+
+    # Open subdatasets to get metadata
+    if sds:  # and ncdf.RasterCount == 0:
+        sds = [[gdal.Open(s[1])] + s for s in sds]
+    elif not sds and ncdf.RasterCount == 0:
+        gscript.warning(_("No data to import from file {}").format(in_url))
+        return None
+    else:
+        # Check raster layers
+        sds = [ncdf, "", "", 0]
+
+    # Extract metadata
+    # Collect relevant inputs in a dictionary
+    inputs_dict[in_url] = {}
+    inputs_dict[in_url]["sds"] = [
+        {
+            "strds_name": (
+                "{}_{}".format(options["output"], s_d[1])
+                if s_d[1] and not semantic_label
+                else options["output"]
+            ),
+            "id": s_d[1],
+            "url": s_d[0].GetDescription(),
+            "grass_metadata": get_metadata(
+                s_d[0].GetMetadata(), s_d[1], semantic_label
+            ),
+            "extended_metadata": s_d[0].GetMetadata(),
+            "time_dimensions": get_time_dimensions(s_d[0].GetMetadata()),
+            "rastercount": s_d[0].RasterCount,
+            "import_options": get_import_type(
+                s_d[0].GetDescription(),
+                flags["o"] or check_projection_match(location_crs, s_d[0]),
+                options["resample"],
+                flags,
+            ),
+        }
+        for s_d in sds
+        if "NETCDF_DIM_time_VALUES" in s_d[0].GetMetadata()
+    ]
+
+    # Close open GDAL datasets
+    sds = None
+
+    # Apply temporal filter
+    for s_d in inputs_dict[in_url]["sds"]:
+        end_times = get_end_time(s_d["time_dimensions"])
+        requested_time_dimensions = np.array(
+            [
+                apply_temporal_filter(
+                    valid_window, valid_relations, start, end_times[idx]
+                )
+                for idx, start in enumerate(s_d["time_dimensions"])
+            ]
+        )
+        if not requested_time_dimensions.any():
+            gscript.warning(
+                _(
+                    "Nothing to import from subdataset {s} in {f}".format(
+                        s=s_d["id"], f=s_d["url"]
+                    )
+                )
+            )
+            inputs_dict[in_url]["sds"].remove(s_d)
+        else:
+            s_d["start_time_dimensions"] = s_d["time_dimensions"][
+                requested_time_dimensions
+            ]
+            s_d["end_time_dimensions"] = end_times[requested_time_dimensions]
+            s_d["requested_time_dimensions"] = np.where(requested_time_dimensions)[0]
+    return inputs_dict
+
+
+def main():
+    """run the main workflow"""
 
     global cf_units
     try:
@@ -749,6 +842,14 @@ def main():
     # Get GRASS GIS environment info
     grass_env = dict(gscript.gisenv())
 
+    # Create directory for vrt files if needed
+    if flags["l"]:
+        vrt_dir = Path(grass_env["GISDBASE"]).joinpath(
+            grass_env["LOCATION_NAME"], grass_env["MAPSET"], "gdal"
+        )
+        if not vrt_dir.is_dir():
+            vrt_dir.mkdir()
+
     # Get projection of the current location
     grass_env["LOCATION_PROJECTION"] = gscript.read_command(
         "g.proj", flags="wf"
@@ -774,106 +875,36 @@ def main():
 
     modified_strds = {}
     queued_modules = []
-    queueing_input = []
-    inputs_dict = {}
 
-    for in_url in inputs:
-        # Check if file exists and readable
-        gscript.verbose(_("Processing {}".format(in_url)))
-        try:
-            ncdf = gdal.Open(in_url)
-        except FileNotFoundError:
-            gscript.warning(_("Could not open <{}>.\nSkipping...".format(in_url)))
-
-        # Get global metadata
-        ncdf_metadata = ncdf.GetMetadata()
-
-        # Get CF version
-        cf_version = ncdf_metadata.get("NC_GLOBAL#Conventions")
-
-        if cf_version is None or not cf_version.upper().startswith("CF"):
-            gscript.warning(
-                _(
-                    "Input netCDF file does not adhere to CF-standard. Import may fail or be incorrect."
-                )
+    if int(options["nprocs"]) <= 1 or len(inputs) <= 1:
+        inputs_dict = [
+            parse_netcdf(
+                in_url,
+                semantic_label,
+                grass_env["LOCATION_PROJECTION"],
+                valid_window,
+                valid_relations,
+                options,
             )
-
-        # try:
-        #     creation_date = parser.parse(ncdf_metadata.get("NC_GLOBAL#creation_date"))
-        # except Exception:
-        #     creation_date = None
-
-        # Sub datasets containing variables have 3 dimensions (x,y,z)
-        sds = [
-            # SDS_ID, SDS_url, SDS_dimension
-            [sds[0].split(":")[-1], sds[0], len(sds[1].split(" ")[0].split("x"))]
-            for sds in ncdf.GetSubDatasets()
-            if len(sds[1].split(" ")[0].split("x")) == 3
+            for in_url in inputs
         ]
-
-        # Filter based on semantic_label if provided
-        if semantic_label is not None:
-            sds = [s for s in sds if s[0] in semantic_label.keys()]
-
-        # Open subdatasets to get metadata
-        if sds:  # and ncdf.RasterCount == 0:
-            sds = [[gdal.Open(s[1])] + s for s in sds]
-        elif not sds and ncdf.RasterCount == 0:
-            gscript.warning(_("No data to import from file {}").format(in_url))
-            continue
-        else:
-            # Check raster layers
-            sds = [ncdf, "", "", 0]
-
-        # Extract metadata
-        # Collect relevant inputs in a dictionary
-        inputs_dict[in_url] = {}
-        inputs_dict[in_url]["sds"] = [
-            {
-                "id": s_d[1],
-                "url": s_d[0].GetDescription(),
-                "grass_metadata": get_metadata(
-                    s_d[0].GetMetadata(), s_d[1], semantic_label
-                ),
-                "extended_metadata": s_d[0].GetMetadata(),
-                "time_dimensions": get_time_dimensions(s_d[0].GetMetadata()),
-                "rastercount": s_d[0].RasterCount,
-            }
-            for s_d in sds
-            if "NETCDF_DIM_time_VALUES" in s_d[0].GetMetadata()
-        ]
-
-        # Close open GDAL datasets
-        sds = None
-
-        # Apply temporal filter
-        for s_d in inputs_dict[in_url]["sds"]:
-            end_times = get_end_time(s_d["time_dimensions"])
-            requested_time_dimensions = np.array(
+    else:
+        with Pool(processes=min([int(options["nprocs"]), len(inputs)])) as p:
+            inputs_dict = p.starmap(
+                parse_netcdf,
                 [
-                    apply_temporal_filter(
-                        valid_window, valid_relations, start, end_times[idx]
+                    (
+                        in_url,
+                        semantic_label,
+                        grass_env["LOCATION_PROJECTION"],
+                        valid_window,
+                        valid_relations,
+                        options,
                     )
-                    for idx, start in enumerate(s_d["time_dimensions"])
-                ]
+                    for in_url in inputs
+                ],
             )
-            if not requested_time_dimensions.any():
-                gscript.warning(
-                    _(
-                        "Nothing to import from subdataset {s} in {f}".format(
-                            s=s_d["id"], f=s_d["url"]
-                        )
-                    )
-                )
-                inputs_dict[in_url]["sds"].remove(s_d)
-            else:
-                s_d["start_time_dimensions"] = s_d["time_dimensions"][
-                    requested_time_dimensions
-                ]
-                s_d["end_time_dimensions"] = end_times[requested_time_dimensions]
-                s_d["requested_time_dimensions"] = np.where(requested_time_dimensions)[
-                    0
-                ]
+    inputs_dict = {k: v for elem in inputs_dict if elem for k, v in elem.items()}
 
     if options["print"] in ["grass", "extended"]:
         # ["|".join([[s["url"], s["id"]] + s["extended_metadata"].values])
@@ -905,82 +936,59 @@ def main():
         )
         sys.exit(0)
 
-    # Check if projections match
-    if flags["o"]:
-        for i in inputs_dict:
-            inputs_dict[i]["proj_match"] = True
-    else:
-        with Pool(processes=int(options["nprocs"])) as pool:
-            # Check (only first subdataset) if projections match
-            projection_match = pool.map(
-                check_projection_match,
-                [inputs_dict[i]["sds"][0]["url"] for i in inputs_dict],
+    # Create STRDS if necessary
+    relevant_strds = {
+        (
+            dval["strds_name"],
+            dval["grass_metadata"]["title"],
+            dval["grass_metadata"]["description"],
+        )
+        for sds_dict in inputs_dict.values()
+        for dval in sds_dict["sds"]
+    }
+    # Get unique list of STRDS to be created or modified
+    for strds in relevant_strds:
+
+        # Append if exists and overwrite allowed (do not update metadata)
+        if (
+            strds[0] not in existing_strds or (gscript.overwrite and not flags["a"])
+        ) and strds[0] not in modified_strds:
+            tgis.open_new_stds(
+                strds[0],
+                "strds",  # type
+                "absolute",  # temporaltype
+                strds[1],
+                strds[2],
+                "mean",  # semanticstype
+                None,  # dbif
+                gscript.overwrite,
             )
+            modified_strds[strds[0]] = []
+        elif not flags["a"]:
+            gscript.fatal(_("STRDS exisits."))
 
-        for idx, url in enumerate(inputs_dict):
-            inputs_dict[url]["proj_match"] = projection_match[idx]
+        else:
+            modified_strds[strds[0]] = []
 
-    for sds in inputs_dict.values():
-
-        # Here loop over subdatasets ()
-        for s_d in sds["sds"]:
-
-            strds_name = (
-                "{}_{}".format(options["output"], s_d["id"])
-                if s_d["id"] and not semantic_label
-                else options["output"]
-            )
-
-            # Append if exists and overwrite allowed (do not update metadata)
-            if strds_name not in existing_strds or (
-                gscript.overwrite and not flags["a"]
-            ):
-                if strds_name not in modified_strds:
-                    tgis.open_new_stds(
-                        strds_name,
-                        "strds",  # type
-                        "absolute",  # temporaltype
-                        s_d["grass_metadata"]["title"],
-                        s_d["grass_metadata"]["description"],
-                        "mean",  # semanticstype
-                        None,  # dbif
-                        gscript.overwrite,
-                    )
-                    modified_strds[strds_name] = []
-            elif not flags["a"]:
-                gscript.fatal(_("STRDS exisits."))
-
-            else:
-                modified_strds[strds_name] = []
-
-            if strds_name not in existing_strds:
-                existing_strds.append(strds_name)
-
-            import_module, resample = get_import_type(
-                s_d["url"], sds["proj_match"], options["resample"], flags, grass_env
-            )
-            queueing_input.append(
-                (
-                    s_d["url"],
-                    # s_d["rastercount"],
-                    s_d["grass_metadata"],
-                    options,
-                    import_module,
-                    flags,
-                    s_d["start_time_dimensions"],
-                    s_d["end_time_dimensions"],
-                    s_d["requested_time_dimensions"],
-                    grass_env,
-                    sds["proj_match"],
-                    resample,
-                    nodata,
-                    strds_name,
-                )
-            )
+        if strds[0] not in existing_strds:
+            existing_strds.append(strds[0])
 
     # This is a time consuming part due to building of VRT files
     with Pool(processes=int(options["nprocs"])) as pool:
-        queueing_results = pool.starmap(read_data, queueing_input)
+        queueing_results = pool.starmap(
+            read_data,
+            [
+                (
+                    sds_dict,
+                    options,
+                    flags,
+                    grass_env,
+                    nodata,
+                )
+                for url_dict in inputs_dict.values()
+                for sds_dict in url_dict["sds"]
+            ],
+        )
     for qres in queueing_results:
         modified_strds[qres[0]].extend(qres[1])
         queued_modules.extend(qres[2])
@@ -1019,4 +1027,18 @@ def main():
 
 if __name__ == "__main__":
     options, flags = gscript.parser()
+
+    # lazy imports
+    global gdal
+    try:
+        from osgeo import gdal, osr
+    except ImportError:
+        gscript.fatal(
+            _(
+                "Unable to load GDAL Python bindings (requires "
+                "package 'python-gdal' or Python library GDAL "
+                "to be installed)."
+            )
+        )
+
     sys.exit(main())
