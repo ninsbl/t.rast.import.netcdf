@@ -129,6 +129,7 @@
 # % multiple: no
 # % label: Resampling method when data is reprojected
 # % options: nearest,bilinear,bilinear_f,bicubic,bicubic_f,cubicspline,lanczos,lanczos_f,min,Q1,average,med,Q3,max,mode
+# % answer: nearest
 # % guisection: Settings
 # %end
 
@@ -176,7 +177,6 @@
 # %end
 
 # %rules
-# % excludes: -o,resample
 # % excludes: -l,-r
 # % excludes: print,output
 # % required: print,output
@@ -398,8 +398,9 @@ def get_metadata(netcdf_metadata, subdataset="", semantic_label=None):
 
 
 def check_projection_match(reference_crs, subdataset):
-    """Check if projections match with projection of the location"""
-    # Rather use osr directly (this is somewhat time consuming)
+    """Check if projections match with projection of the location
+    using gdal/osr
+    """
     subdataset_crs = subdataset.GetSpatialRef()
     location_crs = osr.SpatialReference()
     location_crs.ImportFromWkt(reference_crs)
@@ -410,15 +411,7 @@ def get_import_type(url, projection_match, resample, flags_dict):
     """Define import type ("r.in.gdal", "r.import", "r.external")"""
 
     if not projection_match and not flags_dict["o"]:
-        if not resample:
-            gscript.warning(
-                _(
-                    "Projection for {} does not match the projection of the "
-                    "current location, but no resampling method has been specified. "
-                    "Using nearest neighbor method for resampling.".format(url)
-                )
-            )
-            resample = "nearest"
+        resample = resample or "nearest"
         if flags_dict["l"] or flags_dict["f"]:
             gscript.warning(
                 _(
