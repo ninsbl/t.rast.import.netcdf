@@ -413,13 +413,6 @@ def get_import_type(url, projection_match, resample, flags_dict):
     if not projection_match and not flags_dict["o"]:
         resample = resample or "nearest"
         if flags_dict["l"] or flags_dict["f"]:
-            gscript.warning(
-                _(
-                    "Cannot link {} directly, using a warped virtual raster through GDAL".format(
-                        url
-                    )
-                )
-            )
             import_type = "r.external"
             if resample not in RESAMPLE_DICT["gdal"]:
                 gscript.fatal(
