@@ -437,7 +437,7 @@ def get_import_type(url, projection_match, resample, flags_dict):
                     )
                 )
             resample = RESAMPLE_DICT["grass"][resample]
-    elif flags_dict["l"]:
+    elif flags_dict["l"] or flags_dict["f"]:
         import_type, resample = "r.external", None
     else:
         import_type, resample = "r.in.gdal", None
@@ -551,10 +551,11 @@ def read_data(
     meta_mod = Module("r.support", quiet=True, run_=False, finish_=False, **metadata)
     # Setup timestamp module
     time_mod = Module("r.timestamp", quiet=True, run_=False, finish_=False)
-    # Setup timestamp module
-    color_mod = Module(
-        "r.colors", quiet=True, color=options_dict["color"], run_=False, finish_=False
-    )
+    if not flags_dict["f"]:
+        # Setup timestamp module
+        color_mod = Module(
+            "r.colors", quiet=True, color=options_dict["color"], run_=False, finish_=False
+        )
     # Parallel module
     mapname_list = []
     infile = Path(input_url).name.split(":")
@@ -586,10 +587,13 @@ def read_data(
             map=mapname,
             date=datetime_to_grass_datetime_string(start_time_dimensions[i]),
         )
-        new_color = deepcopy(color_mod)
-        new_color(map=mapname)
+        if not flags_dict["f"]:
+            new_color = deepcopy(color_mod)
+            new_color(map=mapname)
 
-        queue.append([new_import, new_meta, new_time, new_color])
+            queue.append([new_import, new_meta, new_time, new_color])
+        else:
+            queue.append([new_import, new_meta, new_time])
 
     return strds_name, maps, queue
 
@@ -829,7 +833,7 @@ def main():
     grass_env = dict(gscript.gisenv())
 
     # Create directory for vrt files if needed
-    if flags["l"]:
+    if flags["l"] or  flags["f"]:
         vrt_dir = Path(grass_env["GISDBASE"]).joinpath(
             grass_env["LOCATION_NAME"], grass_env["MAPSET"], "gdal"
         )
@@ -984,12 +988,16 @@ def main():
         queue.put(
             MultiModule(
                 module_list=m_m,
-                sync=True,
+                sync=False,
                 set_temp_region=False,
             )
         )
     queue.wait()
 
+    for strds_name, r_maps in modified_strds.items():
+        with open("./reg.txt", "w") as r:
+            r.write("\n".join(r_maps))
+            r.write("\n")
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
         tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
