@@ -554,7 +554,11 @@ def read_data(
     if not flags_dict["f"]:
         # Setup timestamp module
         color_mod = Module(
-            "r.colors", quiet=True, color=options_dict["color"], run_=False, finish_=False
+            "r.colors",
+            quiet=True,
+            color=options_dict["color"],
+            run_=False,
+            finish_=False,
         )
     # Parallel module
     mapname_list = []
@@ -833,7 +837,7 @@ def main():
     grass_env = dict(gscript.gisenv())
 
     # Create directory for vrt files if needed
-    if flags["l"] or  flags["f"]:
+    if flags["l"] or flags["f"]:
         vrt_dir = Path(grass_env["GISDBASE"]).joinpath(
             grass_env["LOCATION_NAME"], grass_env["MAPSET"], "gdal"
         )
