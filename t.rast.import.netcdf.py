@@ -215,6 +215,7 @@ import numpy as np
 import grass.script as gscript
 import grass.temporal as tgis
 from grass.pygrass.modules import Module, MultiModule, ParallelModuleQueue
+from grass.pygrass.raster import RasterRow
 
 # from grass.temporal. import update_from_registered_maps
 from grass.temporal.register import register_maps_in_space_time_dataset
@@ -521,13 +522,21 @@ def read_data(
     # r.import [-enl]
     # r.in.gdal [-eflakcrp]
     is_subdataset = input_url.startswith("NETCDF")
+
     # Setup import module
     import_mod = Module(
         import_type,
         quiet=True,
         input=input_url
-        if not is_subdataset
-        else create_vrt(input_url, gisenv, resamp, nodata, projection_match),
+        if import_type != "r.external"
+        else create_vrt(
+            input_url,
+            gisenv,
+            resamp,
+            nodata,
+            projection_match,
+            recreate=gscript.overwrite(),
+        ),
         run_=False,
         finish_=False,
         flags=imp_flags,
@@ -538,15 +547,16 @@ def read_data(
     if import_type != "r.external":
         import_mod.flags.a = True
         import_mod.flags.r = True
-        import_mod.memory = options_dict["memory"]
+        import_mod.inputs.memory = options_dict["memory"]
     if import_type == "r.import":
-        import_mod.resample = resamp
-        # import_mod.resolution = options["resolution"]
-        # import_mod.resolution_value = options["resolution_value"]
+        import_mod.inputs.resample = resamp
+        import_mod.inputs.resolution = "region"
+        import_mod.inputs.extent = "region"
+        # import_mod.inputs.resolution_value = options["resolution_value"]
     if import_type == "r.in.gdal":
         import_mod.flags.r = flags_dict["r"]
-        # import_mod.offset = options["offset"]
-        # import_mod.num_digits = options["num_digits"]
+        # import_mod.inputs.offset = options["offset"]
+        # import_mod.inputs.num_digits = options["num_digits"]
     # Setup metadata module
     meta_mod = Module("r.support", quiet=True, run_=False, finish_=False, **metadata)
     # Setup timestamp module
@@ -582,8 +592,6 @@ def read_data(
                 else metadata["semantic_label"],
             )
         )
-        new_import = deepcopy(import_mod)
-        new_import(band=band + 1, output=mapname)
         new_meta = deepcopy(meta_mod)
         new_meta(map=mapname)
         new_time = deepcopy(time_mod)
@@ -591,27 +599,33 @@ def read_data(
             map=mapname,
             date=datetime_to_grass_datetime_string(start_time_dimensions[i]),
         )
+        mm = []
+        if not RasterRow(mapname, gisenv["MAPSET"]).exist() or gscript.overwrite():
+            new_import = deepcopy(import_mod)
+            new_import(band=band + 1, output=mapname)
+            mm.append(new_import)
         if not flags_dict["f"]:
             new_color = deepcopy(color_mod)
             new_color(map=mapname)
+            mm.append(new_color)
+        mm.extend([new_meta, new_time])
 
-            queue.append([new_import, new_meta, new_time, new_color])
-        else:
-            queue.append([new_import, new_meta, new_time])
+        queue.append(mm)
 
     return strds_name, maps, queue
 
 
-def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj):
+def create_vrt(subdataset_url, gisenv, resample, nodata, equal_proj, recreate=False):
     """Create a GDAL VRT for import"""
     vrt_dir = Path(gisenv["GISDBASE"]).joinpath(
         gisenv["LOCATION_NAME"], gisenv["MAPSET"], "gdal"
     )
-    vrt_name = str(
-        vrt_dir.joinpath(
-            "netcdf_{}.vrt".format(legalize_name_string(Path(subdataset_url).name))
-        )
+    vrt = vrt_dir.joinpath(
+        "netcdf_{}.vrt".format(legalize_name_string(Path(subdataset_url).name))
     )
+    vrt_name = str(vrt)
+    if vrt.exists() and not recreate:
+        return vrt_name
     kwargs = {"format": "VRT"}
     if equal_proj:
         if nodata is not None:
@@ -771,6 +785,15 @@ def parse_netcdf(
             s_d["end_time_dimensions"] = end_times[requested_time_dimensions]
             s_d["requested_time_dimensions"] = np.where(requested_time_dimensions)[0]
     return inputs_dict
+
+
+def run_modules(mod_list):
+    for mm in mod_list:
+        MultiModule(
+            module_list=mm,
+            sync=True,
+            set_temp_region=False,
+        ).run()
 
 
 def main():
@@ -987,21 +1010,11 @@ def main():
         modified_strds[qres[0]].extend(qres[1])
         queued_modules.extend(qres[2])
 
-    queue = ParallelModuleQueue(nprocs=options["nprocs"])
-    for m_m in queued_modules:
-        queue.put(
-            MultiModule(
-                module_list=m_m,
-                sync=False,
-                set_temp_region=False,
-            )
-        )
-    queue.wait()
+    # Run modules in parallel
+    use_cores = min(len(queued_modules), int(options["nprocs"]))
+    with Pool(processes=use_cores) as pool:
+        pool.map(run_modules, np.array_split(queued_modules, use_cores))
 
-    for strds_name, r_maps in modified_strds.items():
-        with open("./reg.txt", "w") as r:
-            r.write("\n".join(r_maps))
-            r.write("\n")
     for strds_name, r_maps in modified_strds.items():
         # Register raster maps in strds using tgis
         tgis_strds = tgis.SpaceTimeRasterDataset(strds_name + "@" + grass_env["MAPSET"])
